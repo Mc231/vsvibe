@@ -1,0 +1,85 @@
+name: VSVibe
+options:
+  bundleIdPrefix: com.shyrochuk
+  deploymentTarget:
+    macOS: "15.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+    DEAD_CODE_STRIPPING: YES
+
+packages:
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    exactVersion: 1.12.0
+
+targets:
+  VSVibe:
+    type: application
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: VSVibe
+        excludes:
+          - "Resources/Info.plist"
+    resources:
+      - VSVibe/Resources/Assets.xcassets
+    info:
+      path: VSVibe/Resources/Info.plist
+      properties:
+        CFBundleName: VSVibe
+        CFBundleDisplayName: VSVibe
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "15.0"
+        NSHumanReadableCopyright: "© 2026 Volodymyr Shyrochuk"
+        NSPrincipalClass: NSApplication
+        NSHighResolutionCapable: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shyrochuk.vsvibe
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        COMBINE_HIDPI_IMAGES: YES
+    dependencies:
+      - package: SwiftTerm
+
+  VSVibeTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: VSVibeTests
+    dependencies:
+      - target: VSVibe
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.shyrochuk.vsvibe.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/VSVibe.app/Contents/MacOS/VSVibe"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  VSVibe:
+    build:
+      targets:
+        VSVibe: all
+        VSVibeTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      coverageTargets:
+        - VSVibe
+      targets:
+        - VSVibeTests
