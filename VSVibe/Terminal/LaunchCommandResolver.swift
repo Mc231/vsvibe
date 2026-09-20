@@ -15,6 +15,7 @@ enum LaunchCommandResolver {
     static let defaultCommand = "claude"
     static let ximCommand = "claudexim"
     static let ximAncestorName = "xim"
+    static let codex = "codex"
 
     /// Known launch aliases. For Claude-family aliases, the `claudeConfigDir`
     /// tells us where to install Stop/Notification hooks. opencode uses its
@@ -29,7 +30,8 @@ enum LaunchCommandResolver {
             LaunchAlias(command: "claudeimpressit",
                         claudeConfigDir: home.appendingPathComponent(".claude-impressit-2", isDirectory: true)),
             LaunchAlias(command: "opencode",
-                        claudeConfigDir: nil)
+                        claudeConfigDir: nil),
+            LaunchAlias(command: "codex", claudeConfigDir: nil)
         ]
     }()
 
