@@ -1,11 +1,17 @@
 import SwiftUI
 
 internal struct GitReviewView: View {
+    /// Identity of one comparison load; `refresh` forces a reload of the
+    /// same branches (used as the `.task(id:)` key).
     private struct Request: Equatable {
         let base: String
         let target: String
         let mode: GitComparisonMode
         let refresh: Int
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.base == rhs.base && lhs.target == rhs.target && lhs.mode == rhs.mode && lhs.refresh == rhs.refresh
+        }
     }
 
     private enum Layout {

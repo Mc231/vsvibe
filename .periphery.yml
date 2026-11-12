@@ -1,0 +1,8 @@
+# Periphery (unused code). Read by `periphery scan` in the repo root, including
+# the run SonarQube's sonar-apple plugin makes during tools/sonar_scan.sh.
+project: VSVibe.xcodeproj
+schemes:
+  - VSVibe
+# Persisted model fields (state.json / stats.json) are written and decoded
+# but may not be read in code; they are part of the file format.
+retain_codable_properties: true

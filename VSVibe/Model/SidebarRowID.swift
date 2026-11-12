@@ -4,4 +4,13 @@
 internal struct SidebarRowID: Hashable {
     internal let groupID: String
     internal let folderID: FolderEntry.ID
+
+    internal static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.groupID == rhs.groupID && lhs.folderID == rhs.folderID
+    }
+
+    internal func hash(into hasher: inout Hasher) {
+        hasher.combine(groupID)
+        hasher.combine(folderID)
+    }
 }

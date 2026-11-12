@@ -14,19 +14,6 @@ internal struct TerminalHostView: NSViewRepresentable {
         static let opaque: CGFloat = 1.0
     }
 
-    @MainActor
-    internal final class Coordinator {
-        internal var onFocusChanged: (Bool) -> Void
-
-        internal init(onFocusChanged: @escaping (Bool) -> Void) {
-            self.onFocusChanged = onFocusChanged
-        }
-
-        deinit {
-            // Holds only a closure; nothing to tear down.
-        }
-    }
-
     /// Container that reports whether keyboard focus is inside it.
     @MainActor
     internal final class FocusObservingContainerView: NSView {
@@ -82,10 +69,6 @@ internal struct TerminalHostView: NSViewRepresentable {
 
     internal let terminalView: LocalProcessTerminalView
     internal let onFocusChanged: (Bool) -> Void
-
-    internal func makeCoordinator() -> Coordinator {
-        Coordinator(onFocusChanged: onFocusChanged)
-    }
 
     internal func makeNSView(context _: Context) -> NSView {
         let container = FocusObservingContainerView()

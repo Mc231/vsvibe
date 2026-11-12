@@ -9,8 +9,6 @@ internal struct TileLayout: Layout {
         static let fallbackSize = CGSize(width: fallbackWidth, height: fallbackHeight)
     }
 
-    internal let count: Int
-
     internal func sizeThatFits(proposal: ProposedViewSize, subviews _: Subviews, cache _: inout ()) -> CGSize {
         proposal.replacingUnspecifiedDimensions(by: Defaults.fallbackSize)
     }

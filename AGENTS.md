@@ -77,7 +77,8 @@ Persisted state lives in `~/Library/Application Support/VSVibe/`.
   coverage** over every `VSVibe/` file not listed in `sonar.coverage.exclusions`
   (`sonar-project.properties` is the single source of truth for that list).
   `tools/lint.sh --analyze` then runs `swiftlint analyze` (unused imports and
-  declarations) on that build log.
+  declarations) on that build log and Periphery (`.periphery.yml`, unused code)
+  on its index store.
 - **SonarQube** (`http://localhost:9000`, project `vsvibe`, profile and gate
   "VSVibe strict": every Swift rule except the same disabled ones; gate = 0 new
   issues, coverage ≥90% overall and on new code, ≤3% duplication, A ratings,

@@ -64,7 +64,7 @@ jobs:
       - name: Build + unit tests + core coverage >= 90%
         run: tools/test.sh
 
-      - name: SwiftLint analyze (unused imports/declarations)
+      - name: SwiftLint analyze + Periphery (unused code)
         run: tools/lint.sh --analyze
 
       # Community Build has no branch analysis: main only (trunk-based).

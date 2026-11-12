@@ -40,6 +40,7 @@ Package.resolved
 
 # Local Claude Code settings
 .claude/settings.local.json
+.claude/worktrees/
 
 # Local secrets (Sonar CI token from sonar_setup.py) — never commit
 .secrets/
