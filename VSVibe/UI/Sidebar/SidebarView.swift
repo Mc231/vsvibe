@@ -196,6 +196,9 @@ struct SidebarView: View {
         Button("Project Stats…") {
             env.showStats(folder: folder)
         }
+        Button("Review Git Changes…") {
+            env.pendingGitReview = folder
+        }
         Button("Edit Project…") {
             env.beginEditProjectFlow(folder: folder)
         }

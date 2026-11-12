@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PaneChromeView: View {
+    @Environment(AppEnvironment.self) private var env
     let session: TerminalSession
     let onClose: () -> Void
     let onRestart: () -> Void
@@ -95,6 +96,11 @@ struct PaneChromeView: View {
             .help("Restart Pane")
 
             Menu {
+                Button {
+                    env.pendingGitReview = session.folder
+                } label: {
+                    Label("Review Git Changes…", systemImage: "doc.text.magnifyingglass")
+                }
                 Button {
                     onOpenFreshPane()
                 } label: {

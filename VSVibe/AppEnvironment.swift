@@ -14,6 +14,7 @@ final class AppEnvironment {
     var isManageLabelsPresented: Bool = false
     var isHookSetupPresented: Bool = false
     var pendingStats: FolderEntry?
+    var pendingGitReview: FolderEntry?
 
     init() {
         let store = FolderStore()

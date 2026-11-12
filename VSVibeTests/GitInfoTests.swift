@@ -39,11 +39,37 @@ final class GitInfoTests: XCTestCase {
         XCTAssertNil(GitInfo.currentBranch(forFolder: dir))
     }
 
+    func testRepositorySearchStopsAtFilesystemRoot() {
+        // A background expectation makes a regression fail promptly instead of
+        // hanging the test runner's main thread like the original bug.
+        let completed = expectation(description: "root search terminates")
+        DispatchQueue.global(qos: .utility).async {
+            XCTAssertNil(GitInfo.headFileURL(forFolder: URL(fileURLWithPath: "/", isDirectory: true)))
+            XCTAssertNil(GitInfo.currentBranch(forFolder: URL(fileURLWithPath: "/../..", isDirectory: true)))
+            completed.fulfill()
+        }
+        wait(for: [completed], timeout: 2)
+    }
+
     func testHeadResolvedFromSubdirectory() {
         let repo = track(TestSupport.makeRepo())
         let sub = repo.appendingPathComponent("a/b", isDirectory: true)
         try? FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
         XCTAssertEqual(GitInfo.currentBranch(forFolder: sub), "main")
+    }
+
+    func testEmptyMissingAndNonstandardHead() {
+        let repo = track(TestSupport.makeRepo())
+        let head = repo.appendingPathComponent(".git/HEAD")
+        TestSupport.write("\n", to: head)
+        XCTAssertNil(GitInfo.currentBranch(forFolder: repo))
+        TestSupport.write("ref: refs/remotes/origin/main\n", to: head)
+        XCTAssertEqual(GitInfo.currentBranch(forFolder: repo), "refs/remotes/origin/main")
+        try? FileManager.default.removeItem(at: head)
+        XCTAssertNil(GitInfo.currentBranch(forFolder: repo))
+        let invalid = track(TestSupport.makeTempDir())
+        TestSupport.write("not a gitdir\n", to: invalid.appendingPathComponent(".git"))
+        XCTAssertNil(GitInfo.headFileURL(forFolder: invalid))
     }
 
     func testWorktreeHeadIndirection() {

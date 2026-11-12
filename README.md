@@ -17,6 +17,12 @@ Requires macOS 15.0 or later.
   bucket.
 - **Live git branch** — read from `.git/HEAD` without spawning a process, with
   an on-demand branch switcher.
+- **Git changes review** — choose **Review Git Changes…** from a project's
+  context menu or a pane's options menu. Select Base and Compare branches
+  (local or cached remote refs), then review changed files and colored diffs.
+  Compare from the common ancestor or directly between branch tips; this is
+  read-only and excludes uncommitted edits. Large file previews are capped at
+  512 KB, and renames appear as an added and a deleted file.
 - **Claude usage tracking** — live token usage and cost per session, parsed
   from Claude Code transcripts.
 - **Hook notifications** — install Claude Code `Stop` / `Notification` /

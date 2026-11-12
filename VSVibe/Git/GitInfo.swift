@@ -18,7 +18,11 @@ enum GitInfo {
                 }
                 return worktreeHeadURL(dotGitFile: dotGit, base: dir)
             }
-            let parent = dir.deletingLastPathComponent()
+            // Foundation can represent the parent of `/` as `/..`, then
+            // `/../..`, so comparing unnormalized parent paths never terminates.
+            // A non-repository project hit this loop on the main-thread poll.
+            guard dir.path != "/", !dir.path.isEmpty else { return nil }
+            let parent = dir.deletingLastPathComponent().standardizedFileURL
             if parent.path == dir.path { return nil }
             dir = parent
         }
@@ -157,34 +161,8 @@ enum GitInfo {
         return stats
     }
 
-    private struct CommandResult {
-        let exitCode: Int32
-        let stdout: String
-        let stderr: String
-    }
-
-    private static func runGit(_ args: [String], inFolder folderURL: URL) -> CommandResult? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["-C", folderURL.path] + args
-        let outPipe = Pipe()
-        let errPipe = Pipe()
-        process.standardOutput = outPipe
-        process.standardError = errPipe
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
-        // git's output here is small (branch list / switch status), so reading
-        // to EOF before waiting won't deadlock the pipe buffer.
-        let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
-        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return CommandResult(
-            exitCode: process.terminationStatus,
-            stdout: String(decoding: outData, as: UTF8.self),
-            stderr: String(decoding: errData, as: UTF8.self)
-        )
+    private static func runGit(_ args: [String], inFolder folderURL: URL) -> GitCommand.Output? {
+        guard let result = try? GitCommand.run(args, in: folderURL), !result.truncated else { return nil }
+        return result
     }
 }

@@ -56,42 +56,39 @@ struct TerminalHostView: NSViewRepresentable {
 final class FocusObservingContainerView: NSView {
     var onFocusChanged: ((Bool) -> Void)?
     private var observer: NSKeyValueObservation?
-    private weak var observedWindow: NSWindow?
+    private var reportedFocus: Bool?
+    private var focusCheckScheduled = false
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         observer?.invalidate()
         observer = nil
-        observedWindow = window
-        guard let window else { return }
-        observer = window.observe(\.firstResponder, options: [.new]) { [weak self] _, _ in
-            MainActor.assumeIsolated {
-                self?.checkFocus()
-            }
-        }
-        checkFocus()
-    }
-
-    private func checkFocus() {
         guard let window else {
-            onFocusChanged?(false)
+            scheduleFocusCheck()
             return
         }
-        let responder = window.firstResponder
-        let hasFocus = responder.map { isResponderDescendant($0) } ?? false
-        onFocusChanged?(hasFocus)
+        observer = window.observe(\.firstResponder, options: [.new]) { [weak self] _, _ in
+            MainActor.assumeIsolated {
+                self?.scheduleFocusCheck()
+            }
+        }
+        scheduleFocusCheck()
     }
 
-    private func isResponderDescendant(_ responder: NSResponder) -> Bool {
-        var current: NSResponder? = responder
-        while let r = current {
-            if let v = r as? NSView, v === self || v.isDescendant(of: self) {
-                return true
-            }
-            current = r.nextResponder
-            if current === self { return true }
+    private func scheduleFocusCheck() {
+        // AppKit can change firstResponder while SwiftUI is mounting a pane or
+        // dismissing a sheet. Publish after that update, and only on a change.
+        guard !focusCheckScheduled else { return }
+        focusCheckScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.focusCheckScheduled = false
+            let view = self.window?.firstResponder as? NSView
+            let focused = view.map { $0 === self || $0.isDescendant(of: self) } ?? false
+            guard self.reportedFocus != focused else { return }
+            self.reportedFocus = focused
+            self.onFocusChanged?(focused)
         }
-        return false
     }
 
     deinit {

@@ -3,21 +3,32 @@ import Foundation
 
 @MainActor
 enum AddFolderCommand {
+    private static var activePanel: NSOpenPanel?
+
     static func run(completion: @escaping (URL) -> Void) {
+        guard activePanel == nil else { return }
         let panel = NSOpenPanel()
+        activePanel = panel
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
         panel.title = "Choose a folder"
         panel.prompt = "Add"
-        panel.message = "Pick a folder. A new terminal pane will open here and run `claude`."
+        panel.message = "Pick a folder, then choose the project name and launch command."
 
-        panel.begin { response in
-            guard response == .OK, let url = panel.url else { return }
+        let finish: (NSApplication.ModalResponse) -> Void = { response in
+            let url = response == .OK ? panel.url : nil
+            activePanel = nil
             DispatchQueue.main.async {
+                guard let url else { return }
                 completion(url)
             }
+        }
+        if let window = NSApp.keyWindow, window.attachedSheet == nil {
+            panel.beginSheetModal(for: window, completionHandler: finish)
+        } else {
+            panel.begin(completionHandler: finish)
         }
     }
 }
