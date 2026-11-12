@@ -62,8 +62,23 @@ xcodegen generate
 xcodebuild -project VSVibe.xcodeproj -scheme VSVibe -enableCodeCoverage YES test
 ```
 
-All non-UI logic (`Model/`, `Store/`, `Stats/`, `Usage/`, `Git/`, `Util/`) is
-covered by unit tests in `VSVibeTests/`, targeting at least 90% line coverage.
+All non-UI logic is covered by unit tests in `VSVibeTests/`, with a gate of at
+least 90% line coverage over every file not in `sonar.coverage.exclusions`.
+
+## Code quality and CI
+
+```sh
+tools/lint.sh             # SwiftLint, every rule, --strict
+tools/test.sh             # clean build + tests + core coverage gate (>= 90%)
+tools/lint.sh --analyze   # swiftlint analyze on that build (unused code)
+tools/sonar_scan.sh       # SonarQube "VSVibe strict" gate (localhost:9000)
+```
+
+CI runs on Gitea Actions (`.gitea/workflows/`) through a pull-mirror of the
+GitHub repo:
+- **every push:** lint, tests and coverage;
+- **`main`:** additionally the Sonar gate and an ad-hoc signed DMG artifact;
+- **`v*` tags:** a notarized DMG artifact.
 
 ## Packaging
 
@@ -94,6 +109,8 @@ VSVibe/
   Util/                  small helpers (debounce, logging, editor registry, ...)
 VSVibeTests/             unit tests for the testable core
 scripts/                 DMG build and notarization
+tools/                   lint, test/coverage gate and Sonar scan wrappers
+.gitea/workflows/        CI (lint, tests, Sonar, DMG) and notarized release
 project.yml              XcodeGen project definition
 ```
 

@@ -62,12 +62,46 @@ Persisted state lives in `~/Library/Application Support/VSVibe/`.
   listing/switching branches and computing git stats shell out to `git` and must
   stay off the main thread and user-triggered (never polled).
 
+## Lint, quality gate and CI (strict)
+
+- **SwiftLint: every rule is on** (`.swiftlint.yml`: `opt_in_rules: [all]` minus
+  four mutually contradictory rules, each documented there). Warnings fail the
+  build: `tools/lint.sh` runs `swiftlint lint --strict`. Never add
+  `swiftlint:disable` comments; fix the code. `swiftlint --fix` handles the
+  autocorrectable rules.
+- **Compiler warnings are errors** for the app and test targets
+  (`SWIFT_TREAT_WARNINGS_AS_ERRORS` in `project.yml`).
+- `tools/test.sh` does a clean build, runs the tests with coverage into
+  `build/ci/result.xcresult`, and runs `tools/check_coverage.py`: **≥90% line
+  coverage** over every `VSVibe/` file not listed in `sonar.coverage.exclusions`
+  (`sonar-project.properties` is the single source of truth for that list).
+  `tools/lint.sh --analyze` then runs `swiftlint analyze` (unused imports and
+  declarations) on that build log.
+- **SonarQube** (`http://localhost:9000`, project `vsvibe`, profile and gate
+  "VSVibe strict": every Swift rule except the same disabled ones; gate = 0 new
+  issues, coverage ≥90% overall and on new code, ≤3% duplication, A ratings,
+  100% hotspots reviewed). `tools/sonar_scan.sh` scans and waits for the gate.
+  It fails closed: `SONAR_REQUIRED=0` skips it when Sonar is down. Fix security
+  hotspots in code; never mark them safe.
+- **CI** is Gitea Actions on the self-hosted macOS runner (`.gitea/workflows/`).
+  Gitea pull-mirrors `github.com/Mc231/vsvibe` every 10 min, so pushing to
+  GitHub triggers it.
+  - `ci.yml`, on every branch: static (SwiftLint, shellcheck, actionlint,
+    gitleaks), then test + coverage + `swiftlint analyze`. On `main` it also
+    runs the Sonar scan and gate, plus an **ad-hoc signed DMG** artifact.
+  - `release.yml` on a `v*` tag (must equal `v` + `CFBundleShortVersionString`):
+    tests, then a **Developer ID signed, notarized, stapled DMG** artifact (runner
+    keychain needs the certificate and the `vsvibe-notary` profile, see
+    `scripts/NOTARIZE.md`).
+- Before pushing: `tools/lint.sh && tools/test.sh && tools/lint.sh --analyze`.
+
 ### Testing rule
 
 All non-UI logic must be covered by unit tests, with a target of **≥90% line
 coverage on the testable core**. The "testable core" is everything that is not a
 SwiftUI `View` or direct system/SwiftTerm integration — i.e. `Model/`, `Store/`,
-`Stats/`, `Usage/`, `Git/`, and `Util/`. SwiftUI views, the `@main` app entry,
+`Stats/`, `Usage/`, `Git/`, `Util/` and the non-glue parts of `Terminal/` and
+`Notifications/`; the exact list is everything not in `sonar.coverage.exclusions`. SwiftUI views, the `@main` app entry,
 SwiftTerm spawning, and AppKit/notification glue are excluded (they are validated
 by running the app, not unit tests).
 
