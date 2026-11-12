@@ -32,7 +32,7 @@ struct FlowLayout: Layout {
         return rows
     }
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .greatestFiniteMagnitude
         let rows = rows(subviews, maxWidth: maxWidth)
         let height = rows.reduce(0) { $0 + $1.height } + lineSpacing * CGFloat(max(0, rows.count - 1))
@@ -40,7 +40,7 @@ struct FlowLayout: Layout {
         return CGSize(width: min(width, maxWidth), height: height)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
         var y = bounds.minY
         for row in rows(subviews, maxWidth: bounds.width) {
             var x = bounds.minX

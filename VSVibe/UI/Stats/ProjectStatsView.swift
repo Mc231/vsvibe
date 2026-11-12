@@ -233,7 +233,7 @@ private struct StatGrid<Content: View>: View {
 private struct StatTile: View {
     let title: String
     let value: String
-    var subtitle: String? = nil
+    var subtitle: String?
     var accent: Bool = false
 
     var body: some View {
@@ -283,8 +283,8 @@ enum Format {
 
     static func duration(_ seconds: Double) -> String {
         let total = Int(seconds)
-        let h = total / 3600
-        let m = (total % 3600) / 60
+        let h = total / 3_600
+        let m = (total % 3_600) / 60
         if h > 0 { return "\(h)h \(m)m" }
         if m > 0 { return "\(m)m" }
         return "\(total)s"

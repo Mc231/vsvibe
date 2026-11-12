@@ -60,7 +60,7 @@ enum LaunchCommandResolver {
     }
 
     /// All folders use the same default; custom commands are selected explicitly.
-    static func defaultCommand(for url: URL) -> String {
-        return defaultCommand
+    static func defaultCommand(for _: URL) -> String {
+        defaultCommand
     }
 }

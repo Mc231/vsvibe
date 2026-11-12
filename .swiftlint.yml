@@ -1,0 +1,53 @@
+# SwiftLint: every rule on (strict). CI runs `swiftlint lint --strict`, so
+# warnings fail the build too. SonarQube (sonar-apple) runs SwiftLint with this
+# same file and the "VSVibe strict" profile has every Swift rule active minus
+# the ones disabled below.
+#
+# Disabled rules — each one either contradicts a rule that stays on, or needs a
+# library this project does not use. Keep the Sonar profile in sync
+# (sonar_setup.py --deactivate swift:SwiftLint:<rule>).
+#   contrasted_opening_brace      contradicts opening_brace (brace on same line)
+#   explicit_type_interface       contradicts redundant_type_annotation
+#   no_extension_access_modifier  contradicts extension_access_modifier
+#   prefer_nimble                 needs Nimble; tests use XCTest only
+
+included:
+  - VSVibe
+  - VSVibeTests
+
+excluded:
+  - build
+  - DerivedData
+  - VSVibe.xcodeproj
+
+opt_in_rules:
+  - all
+
+disabled_rules:
+  - contrasted_opening_brace
+  - explicit_type_interface
+  - no_extension_access_modifier
+  - prefer_nimble
+
+# `swiftlint analyze` (needs a clean-build compiler log; see tools/lint.sh).
+# explicit_self is left out: it contradicts redundant_self_in_closure.
+analyzer_rules:
+  - capture_variable
+  - typesafe_array_init
+  - unused_declaration
+  - unused_import
+
+# Defaults are kept for every size/complexity threshold (line_length 120,
+# function_body_length 50, type_body_length 250, file_length 400,
+# cyclomatic_complexity 10, ...). Only rules that need configuration to be
+# usable at all are configured here.
+
+identifier_name:
+  excluded:
+    - id
+
+indentation_width:
+  indentation_width: 4
+  include_comments: true
+  include_compiler_directives: true
+  include_multiline_strings: false

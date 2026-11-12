@@ -1,8 +1,7 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 final class StatsModelsTests: XCTestCase {
-
     // MARK: DayKey
 
     func testTodayMatchesKeyForNow() {
@@ -11,7 +10,7 @@ final class StatsModelsTests: XCTestCase {
 
     func testKeyFormat() {
         var comps = DateComponents()
-        comps.year = 2026; comps.month = 5; comps.day = 9
+        comps.year = 2_026; comps.month = 5; comps.day = 9
         comps.hour = 13; comps.minute = 30
         let date = Calendar.current.date(from: comps)!
         XCTAssertEqual(DayKey.key(for: date), "2026-05-09")
@@ -83,7 +82,7 @@ final class StatsModelsTests: XCTestCase {
         day.notifications = 1
         var project = ProjectStat()
         project.days["2026-05-22"] = day
-        project.transcriptBytes["a.jsonl"] = 1234
+        project.transcriptBytes["a.jsonl"] = 1_234
         var state = StatsState()
         state.projects["/Users/test/demo"] = project
 
@@ -96,7 +95,7 @@ final class StatsModelsTests: XCTestCase {
         XCTAssertEqual(d?.modelMessageCounts["claude-opus-4-7"], 3)
         XCTAssertEqual(d?.transcriptSessionIds, ["s1", "s2"])
         XCTAssertEqual(d?.panesOpened, 2)
-        XCTAssertEqual(decoded.projects["/Users/test/demo"]?.transcriptBytes["a.jsonl"], 1234)
+        XCTAssertEqual(decoded.projects["/Users/test/demo"]?.transcriptBytes["a.jsonl"], 1_234)
     }
 
     func testDefaultsAreZero() {

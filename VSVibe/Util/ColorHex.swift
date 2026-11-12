@@ -16,7 +16,7 @@ enum ColorHex {
         var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         if s.hasPrefix("#") { s.removeFirst() }
         guard s.count == 6 || s.count == 3 else { return nil }
-        guard s.allSatisfy({ $0.isHexDigit }) else { return nil }
+        guard s.allSatisfy(\.isHexDigit) else { return nil }
         if s.count == 3 {
             // Expand shorthand: #abc -> #aabbcc
             s = s.map { "\($0)\($0)" }.joined()

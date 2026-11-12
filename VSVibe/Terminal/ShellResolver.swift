@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 enum ShellResolver {
     static func userLoginShell() -> String {
@@ -15,7 +15,7 @@ enum ShellResolver {
         return "/bin/zsh"
     }
 
-    static func loginArgs(for shellPath: String) -> [String] {
+    static func loginArgs(for _: String) -> [String] {
         ["-l"]
     }
 }

@@ -1,9 +1,8 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 @MainActor
 final class FolderStoreTests: XCTestCase {
-
     private var dir: URL!
     private var stateFile: URL!
 
@@ -143,7 +142,7 @@ final class FolderStoreTests: XCTestCase {
 
         XCTAssertEqual(store.labels.map(\.name), ["Pet"])
         XCTAssertEqual(store.folders.count, 1)
-        XCTAssertEqual(store.folders.first(where: { $0.id == entry.id })?.labelIDs, [pet.id])
+        XCTAssertEqual(store.folders.first { $0.id == entry.id }?.labelIDs, [pet.id])
     }
 
     func testDeleteUnknownLabelIsNoOp() {

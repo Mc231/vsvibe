@@ -69,7 +69,7 @@ enum GitReview {
         let result = try GitCommand.run(["--literal-pathspecs", "diff", "--no-ext-diff", "--no-textconv",
                                          "--no-color", "--no-renames", "--ignore-submodules=none", "--unified=3",
                                          comparison.baseCommit, comparison.targetCommit, "--", file.path],
-                                        in: folder, outputLimit: 512 * 1024)
+                                        in: folder, outputLimit: 512 * 1_024)
         try check(result)
         return result.stdout + (result.truncated ? "\n… Diff preview truncated at 512 KB.\n" : "")
     }

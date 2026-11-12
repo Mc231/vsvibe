@@ -1,5 +1,5 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 final class CommandLocatorTests: XCTestCase {
     private var tempDirs: [URL] = []

@@ -11,7 +11,7 @@ struct PersistedState: Codable {
     /// v1: folders only. v2: adds `labels` / `ungroupedCollapsed` and
     /// `FolderEntry.labelIDs`. v1 files decode as v2 with no labels.
     static let currentVersion = 2
-    static let empty = PersistedState(version: currentVersion, folders: [])
+    static let empty = Self(version: currentVersion, folders: [])
 
     init(version: Int,
          folders: [FolderEntry],

@@ -1,8 +1,7 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 final class ModelPricingTests: XCTestCase {
-
     func testExactRates() {
         let opus = ModelPricing.rates(for: "claude-opus-4-7")
         XCTAssertEqual(opus.input, 15.0)

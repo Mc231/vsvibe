@@ -34,7 +34,7 @@ enum DayKey {
 /// which is the common identifier across transcripts (path-encoded), git, and
 /// runtime events.
 struct StatsState: Codable {
-    var version: Int = StatsState.currentVersion
+    var version: Int = Self.currentVersion
     var projects: [String: ProjectStat] = [:]
 
     static let currentVersion = 1

@@ -1,5 +1,5 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 final class GitInfoTests: XCTestCase {
     private var dirs: [URL] = []
@@ -99,14 +99,16 @@ final class GitInfoTests: XCTestCase {
         let repo = track(TestSupport.makeRepo())
         TestSupport.git(["branch", "dev"], in: repo)
         let result = GitInfo.switchBranch("dev", forFolder: repo)
-        guard case .success = result else { return XCTFail("expected success") }
+        guard case .success = result else { XCTFail("expected success")
+return }
         XCTAssertEqual(GitInfo.currentBranch(forFolder: repo), "dev")
     }
 
     func testSwitchBranchFailureSurfacesMessage() {
         let repo = track(TestSupport.makeRepo())
         let result = GitInfo.switchBranch("does-not-exist", forFolder: repo)
-        guard case .failure(let error) = result else { return XCTFail("expected failure") }
+        guard case .failure(let error) = result else { XCTFail("expected failure")
+return }
         XCTAssertFalse(error.message.isEmpty)
     }
 

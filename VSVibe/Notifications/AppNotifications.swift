@@ -1,6 +1,6 @@
+import AppKit
 import Foundation
 import UserNotifications
-import AppKit
 
 @MainActor
 final class AppNotifications: NSObject {
@@ -43,14 +43,14 @@ final class AppNotifications: NSObject {
 }
 
 extension AppNotifications: UNUserNotificationCenterDelegate {
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                            willPresent notification: UNNotification,
+    nonisolated func userNotificationCenter(_: UNUserNotificationCenter,
+                                            willPresent _: UNNotification,
                                             withCompletionHandler completionHandler:
                                             @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .sound])
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+    nonisolated func userNotificationCenter(_: UNUserNotificationCenter,
                                             didReceive response: UNNotificationResponse,
                                             withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo

@@ -10,7 +10,7 @@ struct ExternalEditor: Identifiable, Hashable {
     let shortcutKey: String?
     let shortcutModifiers: EventModifiers
 
-    static func == (lhs: ExternalEditor, rhs: ExternalEditor) -> Bool {
+    static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id
     }
 

@@ -1,0 +1,104 @@
+name: CI
+
+# Gitea pull-mirrors github.com/Mc231/vsvibe, so every mirror sync arrives as a
+# `push` (never `pull_request`). CI never writes back to the origin.
+#
+# Runner: self-hosted act_runner on the owner's Mac, label `macos`, host mode,
+# capacity 1 (jobs queue). Cheapest failure first: static -> test (+ Sonar on
+# main) -> DMG (main only).
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  static:
+    name: Lint (SwiftLint strict), shellcheck, actionlint, gitleaks
+    runs-on: macos
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SwiftLint (every rule, --strict)
+        run: |
+          swiftlint version
+          tools/lint.sh
+
+      - name: shellcheck
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck -x -s bash
+
+      - name: actionlint
+        # `macos` is this runner's self-hosted label; upload-artifact@v3 is
+        # retired on github.com only, Gitea serves its protocol.
+        run: |
+          actionlint \
+            -ignore 'label "macos" is unknown' \
+            -ignore 'the runner of "actions/upload-artifact@v3" action is too old' \
+            .gitea/workflows/*.yml
+
+      - name: gitleaks (pushed commit)
+        run: gitleaks detect --no-banner --redact --log-opts=-1
+
+  test:
+    name: Build, test, coverage gate${{ github.ref == 'refs/heads/main' && ', SonarQube' || '' }}
+    needs: static
+    runs-on: macos
+    timeout-minutes: 45
+    env:
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # Fail closed: an unreachable Sonar fails the job.
+      SONAR_REQUIRED: '1'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Sonar's new-code period and blame need history.
+          fetch-depth: 0
+
+      - name: Build + unit tests + core coverage >= 90%
+        run: tools/test.sh
+
+      - name: SwiftLint analyze (unused imports/declarations)
+        run: tools/lint.sh --analyze
+
+      # Community Build has no branch analysis: main only (trunk-based).
+      # Same job as the tests: the scan needs the result bundle + index store.
+      - name: SonarQube scan (waits for the "VSVibe strict" gate)
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: tools/sonar_scan.sh
+
+      - name: Upload test results
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: |
+            build/ci/xcodebuild.log
+          retention-days: 7
+
+  dmg:
+    name: Ad-hoc DMG
+    needs: test
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: macos
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build ad-hoc signed DMG
+        run: scripts/build-dmg.sh
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v3
+        with:
+          name: VSVibe-${{ github.sha }}-adhoc
+          path: build/VSVibe.dmg
+          if-no-files-found: error
+          retention-days: 30

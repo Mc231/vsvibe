@@ -1,5 +1,5 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 @MainActor
 final class LaunchAliasStoreTests: XCTestCase {

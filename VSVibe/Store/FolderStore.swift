@@ -37,7 +37,7 @@ final class FolderStore {
         let resolved = url.standardizedFileURL
         if let existing = folders.first(where: { $0.url.standardizedFileURL == resolved }) {
             updateProject(id: existing.id, name: name, launchCommand: launchCommand, labelIDs: labelIDs)
-            return folders.first(where: { $0.id == existing.id }) ?? existing
+            return folders.first { $0.id == existing.id }?? existing
         }
         let entry = FolderEntry(url: resolved,
                                 displayName: name,

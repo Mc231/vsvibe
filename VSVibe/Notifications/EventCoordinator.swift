@@ -1,6 +1,6 @@
+import AppKit
 import Foundation
 import Observation
-import AppKit
 
 @MainActor
 @Observable
@@ -54,7 +54,7 @@ final class EventCoordinator {
         applyToSession(session, event: event)
         statsStore.recordHookEvent(folderURL: session.folder.url, kind: event.event)
 
-        let folderName = folderStore.folders.first(where: { $0.id == session.id })?.displayName
+        let folderName = folderStore.folders.first { $0.id == session.id }?.displayName
             ?? session.folder.displayName
         AppNotifications.shared.post(
             title: "\(folderName) — \(event.event.displayName)",
@@ -79,10 +79,12 @@ final class EventCoordinator {
             session.awaitingInput = true
             session.unreadEventCount += 1
             session.lastEventLabel = event.message ?? "Needs input"
+
         case .stop, .subagentStop:
             session.awaitingInput = false
             session.unreadEventCount += 1
             session.lastEventLabel = "Finished"
+
         case .unknown:
             break
         }

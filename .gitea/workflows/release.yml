@@ -1,0 +1,58 @@
+name: Release (notarized DMG)
+
+# A pushed `v*` tag (e.g. v0.2.0) arrives through the mirror and builds a
+# Developer ID signed, notarized and stapled DMG.
+#
+# Prerequisites on the runner Mac (one-time, see scripts/NOTARIZE.md):
+#   - "Developer ID Application" certificate in the login keychain;
+#   - notarytool keychain profile `vsvibe-notary`;
+#   - the login keychain unlocked (the runner is a LaunchAgent in the GUI session).
+# The tag must equal `v` + CFBundleShortVersionString in project.yml.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Test, then notarized DMG
+    runs-on: macos
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Tag matches project.yml version
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          version=$(sed -n 's/.*CFBundleShortVersionString: *"\(.*\)".*/\1/p' project.yml | head -1)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match project.yml version $version"
+            exit 1
+          fi
+
+      - name: Strict lint
+        run: tools/lint.sh
+
+      - name: Build + unit tests + core coverage >= 90%
+        run: tools/test.sh
+
+      - name: Signing prerequisites present
+        run: |
+          security find-identity -v -p codesigning | grep -q "Developer ID Application" \
+            || { echo "::error::no Developer ID Application identity in the keychain (scripts/NOTARIZE.md)"; exit 1; }
+
+      - name: Build, sign, notarize and staple DMG
+        env:
+          NOTARIZE: '1'
+        run: scripts/build-dmg.sh
+
+      - name: Upload notarized DMG
+        uses: actions/upload-artifact@v3
+        with:
+          name: VSVibe-${{ github.ref_name }}
+          path: build/VSVibe.dmg
+          if-no-files-found: error
+          retention-days: 90

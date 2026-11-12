@@ -1,6 +1,6 @@
 import AppKit
-import SwiftUI
 import SwiftTerm
+import SwiftUI
 
 struct TerminalHostView: NSViewRepresentable {
     let terminalView: LocalProcessTerminalView
@@ -10,7 +10,7 @@ struct TerminalHostView: NSViewRepresentable {
         Coordinator(onFocusChanged: onFocusChanged)
     }
 
-    func makeNSView(context: Context) -> NSView {
+    func makeNSView(context _: Context) -> NSView {
         let container = FocusObservingContainerView()
         container.translatesAutoresizingMaskIntoConstraints = false
         container.onFocusChanged = onFocusChanged
@@ -29,7 +29,7 @@ struct TerminalHostView: NSViewRepresentable {
         return container
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
+    func updateNSView(_ nsView: NSView, context _: Context) {
         if let container = nsView as? FocusObservingContainerView {
             container.onFocusChanged = onFocusChanged
         }
@@ -82,12 +82,12 @@ final class FocusObservingContainerView: NSView {
         focusCheckScheduled = true
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.focusCheckScheduled = false
-            let view = self.window?.firstResponder as? NSView
+            focusCheckScheduled = false
+            let view = window?.firstResponder as? NSView
             let focused = view.map { $0 === self || $0.isDescendant(of: self) } ?? false
-            guard self.reportedFocus != focused else { return }
-            self.reportedFocus = focused
-            self.onFocusChanged?(focused)
+            guard reportedFocus != focused else { return }
+            reportedFocus = focused
+            onFocusChanged?(focused)
         }
     }
 

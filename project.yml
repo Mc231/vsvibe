@@ -14,6 +14,9 @@ settings:
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: "-"
     DEAD_CODE_STRIPPING: YES
+    # Strict: warnings fail the build (Sonar imports compiler warnings as issues).
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    GCC_TREAT_WARNINGS_AS_ERRORS: YES
 
 packages:
   SwiftTerm:

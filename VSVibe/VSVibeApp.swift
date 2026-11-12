@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 @main
 struct VSVibeApp: App {
@@ -23,7 +23,7 @@ struct VSVibeApp: App {
                     get: { env.isHookSetupPresented },
                     set: { env.isHookSetupPresented = $0 })
                 ) {
-                    HookSetupView(aliasStore: env.aliasStore, onClose: { env.isHookSetupPresented = false })
+                    HookSetupView(aliasStore: env.aliasStore) { env.isHookSetupPresented = false }
                 }
         }
         .windowStyle(.titleBar)
@@ -71,7 +71,7 @@ struct VSVibeApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool {
         true
     }
 }

@@ -1,8 +1,7 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 final class SidebarGroupingTests: XCTestCase {
-
     private func folder(_ name: String, labels: [UUID] = []) -> FolderEntry {
         FolderEntry(url: URL(fileURLWithPath: "/Users/x/\(name)"), displayName: name, labelIDs: labels)
     }
@@ -95,7 +94,6 @@ final class SidebarGroupingTests: XCTestCase {
 }
 
 final class FolderOrderingTests: XCTestCase {
-
     private func folder(_ name: String, labels: [UUID] = []) -> FolderEntry {
         FolderEntry(url: URL(fileURLWithPath: "/Users/x/\(name)"), displayName: name, labelIDs: labels)
     }

@@ -30,17 +30,17 @@ struct SessionUsage: Equatable {
 enum ModelPricing {
     /// Rates in USD per million tokens: (input, output, cacheWrite, cacheRead).
     private static let table: [String: (Double, Double, Double, Double)] = [
-        "claude-opus-4-7":          (15.0, 75.0, 18.75, 1.50),
-        "claude-opus-4-6":          (15.0, 75.0, 18.75, 1.50),
-        "claude-opus-4-5":          (15.0, 75.0, 18.75, 1.50),
-        "claude-opus-4":            (15.0, 75.0, 18.75, 1.50),
-        "claude-sonnet-4-6":        (3.0,  15.0, 3.75,  0.30),
-        "claude-sonnet-4-5":        (3.0,  15.0, 3.75,  0.30),
-        "claude-sonnet-4":          (3.0,  15.0, 3.75,  0.30),
-        "claude-3-5-sonnet":        (3.0,  15.0, 3.75,  0.30),
-        "claude-haiku-4-5":         (1.0,  5.0,  1.25,  0.10),
-        "claude-haiku-4":           (1.0,  5.0,  1.25,  0.10),
-        "claude-3-5-haiku":         (1.0,  5.0,  1.25,  0.10)
+        "claude-opus-4-7": (15.0, 75.0, 18.75, 1.50),
+        "claude-opus-4-6": (15.0, 75.0, 18.75, 1.50),
+        "claude-opus-4-5": (15.0, 75.0, 18.75, 1.50),
+        "claude-opus-4": (15.0, 75.0, 18.75, 1.50),
+        "claude-sonnet-4-6": (3.0, 15.0, 3.75, 0.30),
+        "claude-sonnet-4-5": (3.0, 15.0, 3.75, 0.30),
+        "claude-sonnet-4": (3.0, 15.0, 3.75, 0.30),
+        "claude-3-5-sonnet": (3.0, 15.0, 3.75, 0.30),
+        "claude-haiku-4-5": (1.0, 5.0, 1.25, 0.10),
+        "claude-haiku-4": (1.0, 5.0, 1.25, 0.10),
+        "claude-3-5-haiku": (1.0, 5.0, 1.25, 0.10)
     ]
 
     private static let opusFallback: (Double, Double, Double, Double) = (15.0, 75.0, 18.75, 1.50)
@@ -66,8 +66,8 @@ enum ModelPricing {
         return input + output + cacheW + cacheR
     }
 
-    static func contextWindow(for model: String?) -> Int {
+    static func contextWindow(for _: String?) -> Int {
         // All current Claude 4.x models advertise 200k token context.
-        return 200_000
+        200_000
     }
 }

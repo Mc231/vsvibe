@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 enum ProjectEditorMode: Identifiable, Equatable {
     case create(url: URL)
@@ -218,6 +218,7 @@ struct ProjectEditorView: View {
             launchCommand = LaunchCommandResolver.defaultCommand(for: url)
             openImmediately = true
             selectedLabelIDs = []
+
         case .edit(let folder):
             name = folder.displayName
             launchCommand = folder.launchCommand

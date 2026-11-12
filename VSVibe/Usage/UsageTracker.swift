@@ -59,14 +59,14 @@ final class UsageTracker {
 struct TranscriptUsageReader {
     let folderURL: URL
     let configDir: URL
-    var chunkSize = 256 * 1024
+    var chunkSize = 256 * 1_024
     private(set) var hasMoreData = false
     private var currentTranscript: URL?
     private var fileOffset: UInt64 = 0
     private var partial = Data()
     private var usage = SessionUsage()
 
-    init(folderURL: URL, configDir: URL, chunkSize: Int = 256 * 1024) {
+    init(folderURL: URL, configDir: URL, chunkSize: Int = 256 * 1_024) {
         self.folderURL = folderURL
         self.configDir = configDir
         self.chunkSize = chunkSize

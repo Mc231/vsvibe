@@ -1,5 +1,5 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 final class GitReviewTests: XCTestCase {
     private var directories: [URL] = []
@@ -110,10 +110,10 @@ final class GitReviewTests: XCTestCase {
     func testRunnerDrainsLargeOutputAndErrorsAndBoundsPreview() throws {
         let url = repo()
         let result = try GitCommand.run(["-c", "yes out | head -c 200000; yes err | head -c 200000 >&2; exit 7"],
-                                        in: url, outputLimit: 1000, executable: URL(fileURLWithPath: "/bin/sh"))
+                                        in: url, outputLimit: 1_000, executable: URL(fileURLWithPath: "/bin/sh"))
         XCTAssertEqual(result.exitCode, 7)
-        XCTAssertEqual(result.stdout.utf8.count, 1000)
-        XCTAssertEqual(result.stderr.utf8.count, 65536)
+        XCTAssertEqual(result.stdout.utf8.count, 1_000)
+        XCTAssertEqual(result.stderr.utf8.count, 65_536)
         XCTAssertTrue(result.truncated)
         XCTAssertThrowsError(try GitCommand.run([], in: url, executable: URL(fileURLWithPath: "/not/a/command")))
         let start = Date()
@@ -125,7 +125,7 @@ final class GitReviewTests: XCTestCase {
     func testLargePatchIsExplicitlyTruncated() throws {
         let url = repo()
         TestSupport.git(["branch", "base"], in: url)
-        TestSupport.write(String(repeating: "a line of text\n", count: 50000), to: url.appendingPathComponent("large.txt"))
+        TestSupport.write(String(repeating: "a line of text\n", count: 50_000), to: url.appendingPathComponent("large.txt"))
         TestSupport.git(["add", "."], in: url)
         TestSupport.git(["commit", "-m", "large"], in: url)
         let result = try GitReview.compare(in: url, base: "base", target: "main", mode: .tips)

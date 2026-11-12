@@ -16,7 +16,7 @@ struct RootSplitView: View {
             MainToolbar()
         }
         .sheet(item: Binding(get: { env.pendingStats }, set: { env.pendingStats = $0 })) { folder in
-            ProjectStatsView(folder: folder, onClose: { env.dismissStats() })
+            ProjectStatsView(folder: folder) { env.dismissStats() }
         }
         .sheet(item: Binding(get: { env.pendingGitReview }, set: { env.pendingGitReview = $0 })) { folder in
             GitReviewView(folder: folder)

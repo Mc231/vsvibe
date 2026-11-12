@@ -211,19 +211,19 @@ final class SessionProcessDelegate: NSObject, LocalProcessTerminalViewDelegate {
         self.onTerminated = onTerminated
     }
 
-    nonisolated func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {
+    nonisolated func sizeChanged(source _: LocalProcessTerminalView, newCols _: Int, newRows _: Int) {
         // No-op; SwiftTerm handles TIOCSWINSZ internally.
     }
 
-    nonisolated func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
+    nonisolated func setTerminalTitle(source _: LocalProcessTerminalView, title _: String) {
         // No-op for now; could update PaneChromeView title.
     }
 
-    nonisolated func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+    nonisolated func hostCurrentDirectoryUpdate(source _: TerminalView, directory _: String?) {
         // No-op.
     }
 
-    nonisolated func processTerminated(source: TerminalView, exitCode: Int32?) {
+    nonisolated func processTerminated(source _: TerminalView, exitCode: Int32?) {
         let code = exitCode
         Task { @MainActor [weak self] in
             self?.onTerminated(code)

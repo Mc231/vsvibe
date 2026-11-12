@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct GitReviewView: View {
     let folder: FolderEntry
@@ -82,7 +82,7 @@ struct GitReviewView: View {
             }
             .font(.caption).padding(12)
         }
-        .frame(minWidth: 900, idealWidth: 1100, minHeight: 580, idealHeight: 740)
+        .frame(minWidth: 900, idealWidth: 1_100, minHeight: 580, idealHeight: 740)
         .task(id: refresh) { await loadBranches() }
         .task(id: request) { await compare() }
         .task(id: patchID) { await loadPatch() }
@@ -153,13 +153,14 @@ struct GitReviewView: View {
             branches = items
             if !items.contains(where: { $0.id == target }) {
                 let currentRef = "refs/heads/" + (current ?? "")
-                target = items.first(where: { $0.id == currentRef })?.id ?? "HEAD"
+                target = items.first { $0.id == currentRef }?.id ?? "HEAD"
             }
             if !items.contains(where: { $0.id == base }) {
-                base = items.first(where: { $0.id == "refs/heads/main" && $0.id != target })?.id
-                    ?? items.first(where: { $0.id == "refs/heads/master" && $0.id != target })?.id
-                    ?? items.first(where: { $0.id != target && $0.id != "HEAD" })?.id ?? target
+                base = items.first { $0.id == "refs/heads/main" && $0.id != target }?.id
+                    ?? items.first { $0.id == "refs/heads/master" && $0.id != target }?.id
+                    ?? items.first { $0.id != target && $0.id != "HEAD" }?.id ?? target
             }
+
         case .failure(let failure):
             branches = []
             comparison = nil
@@ -215,7 +216,7 @@ struct GitReviewView: View {
 private struct DiffTextView: NSViewRepresentable {
     let text: String
 
-    func makeNSView(context: Context) -> NSScrollView {
+    func makeNSView(context _: Context) -> NSScrollView {
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
@@ -233,7 +234,7 @@ private struct DiffTextView: NSViewRepresentable {
         return scroll
     }
 
-    func updateNSView(_ scroll: NSScrollView, context: Context) {
+    func updateNSView(_ scroll: NSScrollView, context _: Context) {
         guard let view = scroll.documentView as? NSTextView, view.string != text else { return }
         let attributed = NSMutableAttributedString(string: text, attributes: [
             .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),

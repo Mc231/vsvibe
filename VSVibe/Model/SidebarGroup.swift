@@ -23,7 +23,6 @@ struct SidebarRowID: Hashable {
 }
 
 enum SidebarGrouping {
-
     /// Builds the sidebar sections in display order: labels in their stored
     /// order, then the unlabelled bucket.
     ///
@@ -46,7 +45,7 @@ enum SidebarGrouping {
         }
 
         let unlabelled = folders.filter { folder in
-            !folder.labelIDs.contains(where: { knownIDs.contains($0) })
+            !folder.labelIDs.contains { knownIDs.contains($0) }
         }
         if !unlabelled.isEmpty || labels.isEmpty {
             result.append(SidebarGroup(label: nil,
@@ -59,7 +58,6 @@ enum SidebarGrouping {
 }
 
 enum FolderOrdering {
-
     /// Applies a drag-reorder that happened *inside one sidebar section* to the
     /// global folder order. The moved projects take over the slots the section's
     /// projects already occupied, leaving every other project where it was.

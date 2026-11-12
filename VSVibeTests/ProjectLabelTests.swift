@@ -1,8 +1,7 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 final class ColorHexTests: XCTestCase {
-
     func testParsesSixDigitWithHash() {
         let rgb = ColorHex.rgb(from: "#FF8000")
         XCTAssertEqual(rgb?.red ?? 0, 1.0, accuracy: 0.001)
@@ -43,7 +42,6 @@ final class ColorHexTests: XCTestCase {
 }
 
 final class ProjectLabelTests: XCTestCase {
-
     private func makeDecoder() -> JSONDecoder {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601

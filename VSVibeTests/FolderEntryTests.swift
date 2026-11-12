@@ -1,8 +1,7 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 final class FolderEntryTests: XCTestCase {
-
     private func makeDecoder() -> JSONDecoder {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601

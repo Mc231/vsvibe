@@ -1,5 +1,5 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 @MainActor
 final class StatsStoreTests: XCTestCase {
@@ -26,7 +26,7 @@ final class StatsStoreTests: XCTestCase {
     func testScanUsesNewlyRegisteredAliasesAndDeduplicatesConfigDirectories() async throws {
         let directory = fileURL.deletingLastPathComponent()
         let aliases = LaunchAliasStore(fileURL: directory.appendingPathComponent("aliases.json"))
-        let store = StatsStore(fileURL: fileURL, aliasesProvider: { aliases.customAliases })
+        let store = StatsStore(fileURL: fileURL) { aliases.customAliases }
         let config = directory.appendingPathComponent("config")
         let transcripts = TranscriptLocator.projectDir(claudeConfigDir: config, folderURL: folder)
         try FileManager.default.createDirectory(at: transcripts, withIntermediateDirectories: true)

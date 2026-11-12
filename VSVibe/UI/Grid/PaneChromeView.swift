@@ -158,8 +158,9 @@ private struct UsageBadge: View {
         let n = usage.totalInput + usage.totalOutput + usage.totalCacheCreation + usage.totalCacheRead
         if n >= 1_000_000 {
             return String(format: "%.1fM", Double(n) / 1_000_000)
-        } else if n >= 1000 {
-            return String(format: "%.0fk", Double(n) / 1000)
+        }
+        if n >= 1_000 {
+            return String(format: "%.0fk", Double(n) / 1_000)
         }
         return "\(n)"
     }

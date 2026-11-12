@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 /// Synchronous worker-only runner. Files avoid stdout/stderr pipe deadlocks;
 /// a deadline bounds stalled Git commands, and reads have a memory limit.
@@ -12,7 +12,7 @@ enum GitCommand {
     }
 
     static func run(_ arguments: [String], in folder: URL,
-                    outputLimit: Int = 16 * 1024 * 1024,
+                    outputLimit: Int = 16 * 1_024 * 1_024,
                     timeout: TimeInterval = 20,
                     executable: URL = URL(fileURLWithPath: "/usr/bin/git")) throws -> Output {
         let directory = FileManager.default.temporaryDirectory
@@ -55,7 +55,7 @@ enum GitCommand {
         defer { try? reader.close(); try? errorReader.close() }
         let limit = max(0, outputLimit)
         let data = try reader.read(upToCount: limit + 1) ?? Data()
-        let errorData = try errorReader.read(upToCount: 64 * 1024) ?? Data()
+        let errorData = try errorReader.read(upToCount: 64 * 1_024) ?? Data()
         return Output(exitCode: process.terminationStatus,
                       stdout: String(decoding: data.prefix(limit), as: UTF8.self),
                       stderr: String(decoding: errorData, as: UTF8.self),

@@ -95,6 +95,7 @@ struct BranchSwitcher: View {
         case .success:
             onSwitched(name)
             dismiss()
+
         case .failure(let error):
             errorMessage = error.message
         }

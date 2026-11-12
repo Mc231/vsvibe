@@ -1,5 +1,5 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 final class TranscriptStatsScannerTests: XCTestCase {
     private var configDir: URL!

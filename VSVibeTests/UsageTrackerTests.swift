@@ -1,5 +1,5 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 final class UsageTrackerTests: XCTestCase {
     private var config: URL!
@@ -47,16 +47,16 @@ final class UsageTrackerTests: XCTestCase {
     }
 
     func testLargeTranscriptProcessesBoundedChunksWithoutDoubleCounting() throws {
-        TestSupport.write(String(repeating: line, count: 4000), to: transcript)
-        var reader = TranscriptUsageReader(folderURL: folder, configDir: config, chunkSize: 4096)
+        TestSupport.write(String(repeating: line, count: 4_000), to: transcript)
+        var reader = TranscriptUsageReader(folderURL: folder, configDir: config, chunkSize: 4_096)
         var latest = reader.poll()
         XCTAssertTrue(reader.hasMoreData)
         XCTAssertLessThan(try XCTUnwrap(latest).messageCount, 100)
         while reader.hasMoreData {
             if let update = reader.poll() { latest = update }
         }
-        XCTAssertEqual(latest?.messageCount, 4000)
-        XCTAssertEqual(latest?.totalInput, 40000)
+        XCTAssertEqual(latest?.messageCount, 4_000)
+        XCTAssertEqual(latest?.totalInput, 40_000)
         XCTAssertNil(reader.poll())
     }
 

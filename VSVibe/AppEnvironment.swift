@@ -21,7 +21,7 @@ final class AppEnvironment {
         let store = FolderStore()
         let aliases = LaunchAliasStore()
         self.aliasStore = aliases
-        let stats = StatsStore(aliasesProvider: { aliases.aliases })
+        let stats = StatsStore { aliases.aliases }
         let manager = SessionManager(statsStore: stats, aliasStore: aliases)
         self.folderStore = store
         self.statsStore = stats
@@ -70,6 +70,7 @@ final class AppEnvironment {
                           launchCommand: result.launchCommand,
                           openImmediately: result.openImmediately,
                           labelIDs: result.labelIDs)
+
         case .edit(let folder):
             updateProject(id: folder.id,
                           name: result.name,
@@ -102,6 +103,7 @@ final class AppEnvironment {
             if let label, let folderID = assignTo {
                 folderStore.addLabel(label.id, to: folderID)
             }
+
         case .edit(let label):
             folderStore.updateLabel(id: label.id,
                                     name: result.name,
@@ -166,7 +168,7 @@ final class AppEnvironment {
                        name: String,
                        launchCommand: String,
                        labelIDs: [ProjectLabel.ID]? = nil) {
-        let previous = folderStore.folders.first(where: { $0.id == id })
+        let previous = folderStore.folders.first { $0.id == id }
         folderStore.updateProject(id: id, name: name, launchCommand: launchCommand, labelIDs: labelIDs)
         guard let prev = previous else { return }
         let commandChanged = prev.launchCommand.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -143,6 +143,7 @@ struct LabelEditorView: View {
             let used = Set(usedColors)
             colorHex = LabelPalette.colors.first { !used.contains($0) } ?? LabelPalette.defaultColor
             symbolName = LabelPalette.defaultSymbol
+
         case .edit(let label):
             name = label.name
             colorHex = label.colorHex

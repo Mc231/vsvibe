@@ -9,7 +9,7 @@ enum HookEventKind: String, Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let raw = try container.decode(String.self)
-        self = HookEventKind(rawValue: raw) ?? .unknown
+        self = Self(rawValue: raw) ?? .unknown
     }
 
     var displayName: String {

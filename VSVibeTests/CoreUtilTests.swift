@@ -1,5 +1,5 @@
-import XCTest
 @testable import VSVibe
+import XCTest
 
 final class TranscriptLocatorTests: XCTestCase {
     func testEncodedProjectNameReplacesSlashesAndDots() {
@@ -120,7 +120,7 @@ final class FormatTests: XCTestCase {
 
     func testTokens() {
         XCTAssertEqual(Format.tokens(950), "950")
-        XCTAssertEqual(Format.tokens(1200), "1k")
+        XCTAssertEqual(Format.tokens(1_200), "1k")
         XCTAssertEqual(Format.tokens(1_500_000), "1.5M")
     }
 
@@ -128,7 +128,7 @@ final class FormatTests: XCTestCase {
         XCTAssertEqual(Format.duration(0), "0s")
         XCTAssertEqual(Format.duration(45), "45s")
         XCTAssertEqual(Format.duration(90), "1m")
-        XCTAssertEqual(Format.duration(3661), "1h 1m")
+        XCTAssertEqual(Format.duration(3_661), "1h 1m")
     }
 
     func testModelPrettify() {
