@@ -66,6 +66,7 @@ struct SidebarView: View {
             ProjectEditorView(
                 mode: mode,
                 availableLabels: env.folderStore.labels,
+                availableAliases: env.aliasStore.aliases.map(\.command),
                 onSave: { result in env.commitEditor(mode: mode, result: result) },
                 onCancel: { env.cancelEditor() }
             )

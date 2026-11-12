@@ -82,9 +82,9 @@ exit 0
         FileManager.default.fileExists(atPath: hookScriptURL.path)
     }
 
-    static func currentStatus() -> Status {
+    static func currentStatus(aliases: [LaunchAlias]) -> Status {
         let scriptOK = isScriptInstalled
-        let aliasStatuses: [AliasStatus] = LaunchCommandResolver.hookCapableAliases.compactMap { alias in
+        let aliasStatuses: [AliasStatus] = aliases.compactMap { alias in
             guard let settingsURL = alias.settingsURL else { return nil }
             let events = (try? readSettings(at: settingsURL))
                 .flatMap { ($0["hooks"] as? [String: Any]).map(registeredEvents(in:)) } ?? []
@@ -103,9 +103,9 @@ exit 0
         try fm.setAttributes([.posixPermissions: NSNumber(value: Int16(0o755))], ofItemAtPath: hookScriptURL.path)
     }
 
-    static func install() throws {
+    static func install(aliases: [LaunchAlias]) throws {
         try writeScript()
-        for alias in LaunchCommandResolver.hookCapableAliases {
+        for alias in aliases.filter(\.supportsClaudeHooks) {
             try installInto(alias: alias)
         }
     }
@@ -124,8 +124,8 @@ exit 0
         }
     }
 
-    static func uninstall() throws {
-        for alias in LaunchCommandResolver.hookCapableAliases {
+    static func uninstall(aliases: [LaunchAlias]) throws {
+        for alias in aliases.filter(\.supportsClaudeHooks) {
             try uninstallFrom(alias: alias)
         }
     }
@@ -164,8 +164,8 @@ exit 0
 
     // MARK: - Private helpers
 
-    static func unsupportedAliases() -> [LaunchAlias] {
-        LaunchCommandResolver.aliases.filter { !$0.supportsClaudeHooks }
+    static func unsupportedAliases(in aliases: [LaunchAlias]) -> [LaunchAlias] {
+        aliases.filter { !$0.supportsClaudeHooks }
     }
 
     private static func makeEntry(forEvent eventName: String) -> [String: Any] {

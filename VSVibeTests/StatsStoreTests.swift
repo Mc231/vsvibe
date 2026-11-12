@@ -23,6 +23,29 @@ final class StatsStoreTests: XCTestCase {
         XCTAssertEqual(store.summary(forFolderURL: folder, window: .today).panesOpened, 2)
     }
 
+    func testScanUsesNewlyRegisteredAliasesAndDeduplicatesConfigDirectories() async throws {
+        let directory = fileURL.deletingLastPathComponent()
+        let aliases = LaunchAliasStore(fileURL: directory.appendingPathComponent("aliases.json"))
+        let store = StatsStore(fileURL: fileURL, aliasesProvider: { aliases.customAliases })
+        let config = directory.appendingPathComponent("config")
+        let transcripts = TranscriptLocator.projectDir(claudeConfigDir: config, folderURL: folder)
+        try FileManager.default.createDirectory(at: transcripts, withIntermediateDirectories: true)
+        let line = TestSupport.jsonl([
+            "type": "assistant", "timestamp": "2026-05-22T10:00:00.000Z", "sessionId": "custom-session",
+            "message": ["model": "claude-opus-4-7", "usage": ["input_tokens": 100, "output_tokens": 20],
+                        "content": [["type": "text", "text": "hi"]]]
+        ])
+        try line.write(to: transcripts.appendingPathComponent("session.jsonl"), atomically: true, encoding: .utf8)
+        await store.scanTranscripts(forFolderURL: folder)
+        XCTAssertEqual(store.summary(forFolderURL: folder, window: .allTime).assistantMessages, 0)
+        try aliases.save(command: "work", configPath: config.path)
+        try aliases.save(command: "work-two", configPath: config.path)
+        await store.scanTranscripts(forFolderURL: folder)
+        XCTAssertEqual(store.summary(forFolderURL: folder, window: .allTime).assistantMessages, 1)
+        await store.scanTranscripts(forFolderURL: folder)
+        XCTAssertEqual(store.summary(forFolderURL: folder, window: .allTime).inputTokens, 100)
+    }
+
     func testRecordActiveTimeIgnoresNonPositive() {
         let store = StatsStore(fileURL: fileURL)
         store.recordActiveTime(folderURL: folder, seconds: 30)

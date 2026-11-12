@@ -15,7 +15,10 @@ final class SessionManager {
     @ObservationIgnored private var openedAt: [TerminalSession.ID: Date] = [:]
     @ObservationIgnored private let statsStore: StatsStore
 
-    init(statsStore: StatsStore) {
+    @ObservationIgnored private let aliasStore: LaunchAliasStore
+
+    init(statsStore: StatsStore, aliasStore: LaunchAliasStore) {
+        self.aliasStore = aliasStore
         self.statsStore = statsStore
     }
 
@@ -81,10 +84,10 @@ final class SessionManager {
 
         verifyLaunchCommand(LaunchCommandResolver.baseCommand(of: command), for: session)
 
-        // Start usage tracker for Claude-family aliases (skip opencode, custom).
+        // Start usage tracker for registered Claude-family aliases.
         // Match on the base executable so commands carrying flags (e.g.
         // `claude --continue`) still resolve to their alias.
-        if let alias = LaunchCommandResolver.alias(for: LaunchCommandResolver.baseCommand(of: command)),
+        if let alias = aliasStore.alias(for: command),
            let configDir = alias.claudeConfigDir {
             let tracker = UsageTracker(folderURL: folder.url, configDir: configDir) { [weak session] usage in
                 session?.usage = usage

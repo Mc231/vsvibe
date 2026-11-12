@@ -22,15 +22,18 @@ struct ProjectEditorView: View {
     let mode: ProjectEditorMode
     /// Labels offered for assignment, in sidebar order.
     let availableLabels: [ProjectLabel]
+    let availableAliases: [String]
     let onSave: (ProjectEditorResult) -> Void
     let onCancel: () -> Void
 
     init(mode: ProjectEditorMode,
          availableLabels: [ProjectLabel] = [],
+         availableAliases: [String] = LaunchCommandResolver.knownAliases,
          onSave: @escaping (ProjectEditorResult) -> Void,
          onCancel: @escaping () -> Void) {
         self.mode = mode
         self.availableLabels = availableLabels
+        self.availableAliases = availableAliases
         self.onSave = onSave
         self.onCancel = onCancel
     }
@@ -131,7 +134,7 @@ struct ProjectEditorView: View {
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.body, design: .monospaced))
                     HStack(spacing: 6) {
-                        ForEach(LaunchCommandResolver.knownAliases, id: \.self) { alias in
+                        ForEach(availableAliases, id: \.self) { alias in
                             CommandChip(
                                 text: alias,
                                 isSelected: trimmedCommand == alias

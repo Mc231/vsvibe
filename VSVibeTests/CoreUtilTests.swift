@@ -16,9 +16,10 @@ final class TranscriptLocatorTests: XCTestCase {
 }
 
 final class LaunchCommandResolverTests: XCTestCase {
-    func testDefaultCommandForXimAncestor() {
-        let url = URL(fileURLWithPath: "/Users/x/work/impressit/xim/lifelight")
-        XCTAssertEqual(LaunchCommandResolver.defaultCommand(for: url), "claudexim")
+    func testDefaultCommandDoesNotDependOnAncestors() {
+        for path in ["/Users/x/work/xim/project", "/Users/x/work/XIM/project", "/"] {
+            XCTAssertEqual(LaunchCommandResolver.defaultCommand(for: URL(fileURLWithPath: path)), "claude")
+        }
     }
 
     func testDefaultCommandForOrdinaryFolder() {
@@ -28,7 +29,6 @@ final class LaunchCommandResolverTests: XCTestCase {
 
     func testAliasLookup() {
         XCTAssertNotNil(LaunchCommandResolver.alias(for: "claude")?.claudeConfigDir)
-        XCTAssertNotNil(LaunchCommandResolver.alias(for: "claudexim")?.claudeConfigDir)
         XCTAssertNil(LaunchCommandResolver.alias(for: "opencode")?.claudeConfigDir)
         XCTAssertFalse(LaunchCommandResolver.alias(for: "opencode")!.supportsClaudeHooks)
         XCTAssertNil(LaunchCommandResolver.alias(for: "not-a-real-alias"))
@@ -38,29 +38,17 @@ final class LaunchCommandResolverTests: XCTestCase {
         let capable = LaunchCommandResolver.hookCapableAliases
         XCTAssertFalse(capable.contains { $0.command == "opencode" })
         XCTAssertTrue(capable.allSatisfy { $0.claudeConfigDir != nil })
-        XCTAssertTrue(capable.count >= 2)
+        XCTAssertEqual(capable.map(\.command), ["claude"])
     }
 
-    func testKnownAliases() {
-        XCTAssertTrue(LaunchCommandResolver.knownAliases.contains("claude"))
-        XCTAssertTrue(LaunchCommandResolver.knownAliases.contains("claudexim"))
-        XCTAssertTrue(LaunchCommandResolver.knownAliases.contains("claudeimpressit"))
-        XCTAssertTrue(LaunchCommandResolver.knownAliases.contains("opencode"))
-    }
-
-    func testClaudeImpressitAliasUsesOwnConfigDir() {
-        let alias = LaunchCommandResolver.alias(for: "claudeimpressit")
-        XCTAssertTrue(alias?.supportsClaudeHooks ?? false)
-        XCTAssertEqual(alias?.claudeConfigDir?.lastPathComponent, ".claude-impressit-2")
-        // Distinct from claudexim's config dir.
-        XCTAssertNotEqual(alias?.claudeConfigDir,
-                          LaunchCommandResolver.alias(for: "claudexim")?.claudeConfigDir)
+    func testKnownAliasesContainOnlyBuiltInCLIs() {
+        XCTAssertEqual(LaunchCommandResolver.knownAliases, ["claude", "opencode", "codex"])
     }
 
     func testBaseCommandStripsArguments() {
         XCTAssertEqual(LaunchCommandResolver.baseCommand(of: "claude --continue"), "claude")
         XCTAssertEqual(LaunchCommandResolver.baseCommand(of: "claude"), "claude")
-        XCTAssertEqual(LaunchCommandResolver.baseCommand(of: "  claudexim --resume foo "), "claudexim")
+        XCTAssertEqual(LaunchCommandResolver.baseCommand(of: "  claude-work --resume foo "), "claude-work")
         XCTAssertEqual(LaunchCommandResolver.baseCommand(of: ""), "")
     }
 
@@ -72,7 +60,7 @@ final class LaunchCommandResolverTests: XCTestCase {
 
     func testContinueCommandAppendsFlag() {
         XCTAssertEqual(LaunchCommandResolver.continueCommand(for: "claude"), "claude --continue")
-        XCTAssertEqual(LaunchCommandResolver.continueCommand(for: "claudexim"), "claudexim --continue")
+        XCTAssertEqual(LaunchCommandResolver.continueCommand(for: "claude-work"), "claude-work --continue")
         XCTAssertEqual(LaunchCommandResolver.continueCommand(for: "  claude  "), "claude --continue")
     }
 

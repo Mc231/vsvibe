@@ -25,6 +25,10 @@ Requires macOS 15.0 or later.
   512 KB, and renames appear as an added and a deleted file.
 - **Claude usage tracking** — live token usage and cost per session, parsed
   from Claude Code transcripts.
+- **Custom aliases** — register, edit and remove existing shell commands from
+  **Aliases & Claude Hooks…** in the app menu. Set an optional Claude config
+  directory for hooks and usage tracking; saved aliases also appear in the
+  project editor. Define the command itself in your shell first.
 - **Hook notifications** — install Claude Code `Stop` / `Notification` /
   `SubagentStop` hooks from inside the app and get notified when a session
   needs attention.
@@ -96,7 +100,7 @@ project.yml              XcodeGen project definition
 ## Data locations
 
 - App state and stats: `~/Library/Application Support/VSVibe/`
-  (`state.json`, `stats.json`)
+  (`state.json`, `stats.json`, `aliases.json`)
 - Hook script and event log: `~/.vsvibe/` (`hooks/claude-notify.sh`,
   `events.jsonl`)
 

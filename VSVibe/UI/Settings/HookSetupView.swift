@@ -2,21 +2,29 @@ import SwiftUI
 import AppKit
 
 struct HookSetupView: View {
+    let aliasStore: LaunchAliasStore
     let onClose: () -> Void
 
-    @State private var status: HookInstaller.Status = HookInstaller.currentStatus()
+    @State private var status = HookInstaller.Status(scriptInstalled: false, aliases: [])
     @State private var lastMessage: String?
     @State private var isError: Bool = false
+    @State private var isAliasEditorPresented = false
+    @State private var editingAlias: LaunchAlias?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
-            body_
+            ScrollView { body_ }
             Divider()
             footer
         }
-        .frame(width: 560)
+        .frame(width: 620, height: 650)
+        .onAppear { refreshStatus() }
+        .onChange(of: aliasStore.customAliases) { refreshStatus() }
+        .sheet(isPresented: $isAliasEditorPresented) {
+            LaunchAliasEditorView(store: aliasStore, alias: editingAlias)
+        }
     }
 
     private var header: some View {
@@ -25,7 +33,7 @@ struct HookSetupView: View {
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Claude Hooks")
+                Text("Aliases & Claude Hooks")
                     .font(.headline)
                 Text("Notify VSVibe when any Claude alias finishes or needs input.")
                     .font(.caption)
@@ -39,6 +47,45 @@ struct HookSetupView: View {
 
     private var body_: some View {
         VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Custom aliases").font(.headline)
+                Spacer()
+                Button("Add Alias…", systemImage: "plus") {
+                    editingAlias = nil
+                    isAliasEditorPresented = true
+                }
+                .disabled(aliasStore.loadError != nil)
+            }
+            Text("Register a command or alias already available in your shell. Add its Claude config directory to enable hooks and usage tracking.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let error = aliasStore.loadError {
+                Text(error).font(.caption).foregroundStyle(.red)
+            } else if aliasStore.customAliases.isEmpty {
+                Text("No custom aliases yet.").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(aliasStore.customAliases) { alias in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(alias.command).font(.system(.body, design: .monospaced))
+                        Text(alias.claudeConfigDir?.path ?? "No Claude config directory")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.middle)
+                    }
+                    Spacer()
+                    Button("Edit") {
+                        editingAlias = alias
+                        isAliasEditorPresented = true
+                    }
+                    Button("Remove", role: .destructive) {
+                        runOperation("Removed alias. Existing project commands are unchanged.") {
+                            try aliasStore.remove(command: alias.command)
+                        }
+                    }
+                }
+            }
+            Divider()
+            Text("Hook status").font(.headline)
             statusBlock(
                 label: "Hook script",
                 detail: HookInstaller.hookScriptURL.path,
@@ -58,7 +105,7 @@ struct HookSetupView: View {
                 )
             }
 
-            ForEach(HookInstaller.unsupportedAliases()) { alias in
+            ForEach(HookInstaller.unsupportedAliases(in: aliasStore.aliases)) { alias in
                 statusBlock(
                     label: "\(alias.command) — separate hook system",
                     detail: "Notifications not yet supported for this CLI.",
@@ -91,12 +138,12 @@ struct HookSetupView: View {
                 .keyboardShortcut(.cancelAction)
             if status.isFullyInstalled {
                 Button("Uninstall", role: .destructive) {
-                    runOperation("Removed hooks from all aliases.") { try HookInstaller.uninstall() }
+                    runOperation("Removed hooks from all aliases.") { try HookInstaller.uninstall(aliases: aliasStore.aliases) }
                 }
             } else {
                 Button(status.isPartiallyInstalled ? "Reinstall Hooks" : "Install Hooks") {
                     runOperation("Installed hooks for all aliases. Restart any running Claude session to apply.") {
-                        try HookInstaller.install()
+                        try HookInstaller.install(aliases: aliasStore.aliases)
                     }
                 }
                 .keyboardShortcut(.defaultAction)
@@ -133,12 +180,16 @@ struct HookSetupView: View {
     private func runOperation(_ successMessage: String, _ op: () throws -> Void) {
         do {
             try op()
-            status = HookInstaller.currentStatus()
+            refreshStatus()
             lastMessage = successMessage
             isError = false
         } catch {
             lastMessage = "Failed: \(error.localizedDescription)"
             isError = true
         }
+    }
+
+    private func refreshStatus() {
+        status = HookInstaller.currentStatus(aliases: aliasStore.aliases)
     }
 }

@@ -23,7 +23,7 @@ struct VSVibeApp: App {
                     get: { env.isHookSetupPresented },
                     set: { env.isHookSetupPresented = $0 })
                 ) {
-                    HookSetupView(onClose: { env.isHookSetupPresented = false })
+                    HookSetupView(aliasStore: env.aliasStore, onClose: { env.isHookSetupPresented = false })
                 }
         }
         .windowStyle(.titleBar)
@@ -46,7 +46,7 @@ struct VSVibeApp: App {
                 .keyboardShortcut("w", modifiers: [.command, .shift])
             }
             CommandGroup(after: .appSettings) {
-                Button("Setup Claude Hooks…") {
+                Button("Aliases & Claude Hooks…") {
                     env.presentHookSetup()
                 }
             }

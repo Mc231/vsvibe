@@ -13,7 +13,11 @@ final class StatsStore {
     @ObservationIgnored private let fileURL: URL
     @ObservationIgnored private let saveDebouncer = Debouncer(interval: 0.7)
 
-    init(fileURL: URL = AppPaths.statsFile) {
+    @ObservationIgnored private let aliasesProvider: () -> [LaunchAlias]
+
+    init(fileURL: URL = AppPaths.statsFile,
+         aliasesProvider: @escaping () -> [LaunchAlias] = { LaunchCommandResolver.aliases }) {
+        self.aliasesProvider = aliasesProvider
         self.fileURL = fileURL
         self.state = Self.read(from: fileURL)
     }
@@ -47,7 +51,7 @@ final class StatsStore {
     /// is applied here.
     func scanTranscripts(forFolderURL folderURL: URL) async {
         let path = Self.key(for: folderURL)
-        let configDirs = LaunchCommandResolver.hookCapableAliases.compactMap(\.claudeConfigDir)
+        let configDirs = Array(Set(aliasesProvider().compactMap(\.claudeConfigDir)))
         let offsets = state.projects[path]?.transcriptBytes ?? [:]
 
         let delta = await Task.detached { () -> ProjectStat in

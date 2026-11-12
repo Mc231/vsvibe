@@ -22,9 +22,9 @@ final class FolderEntryTests: XCTestCase {
         XCTAssertEqual(entry.launchCommand, "claude")
     }
 
-    func testInitWithXimDefaultsCommand() {
+    func testInitDoesNotChooseCommandFromAncestor() {
         let url = URL(fileURLWithPath: "/Users/x/xim/app")
-        XCTAssertEqual(FolderEntry(url: url).launchCommand, "claudexim")
+        XCTAssertEqual(FolderEntry(url: url).launchCommand, "claude")
     }
 
     func testRoundTrip() throws {
@@ -50,7 +50,7 @@ final class FolderEntryTests: XCTestCase {
         let stripped = try JSONSerialization.data(withJSONObject: obj)
 
         let decoded = try makeDecoder().decode(FolderEntry.self, from: stripped)
-        XCTAssertEqual(decoded.launchCommand, "claude") // default for non-xim path
+        XCTAssertEqual(decoded.launchCommand, "claude")
     }
 
     func testPersistedStateRoundTrip() throws {

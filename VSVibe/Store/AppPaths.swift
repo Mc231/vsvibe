@@ -21,4 +21,8 @@ enum AppPaths {
     static var statsFile: URL {
         applicationSupportDirectory.appendingPathComponent("stats.json", isDirectory: false)
     }
+
+    static var aliasesFile: URL {
+        applicationSupportDirectory.appendingPathComponent("aliases.json", isDirectory: false)
+    }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-struct LaunchAlias: Identifiable, Hashable {
+struct LaunchAlias: Codable, Identifiable, Hashable {
     let command: String
     /// Claude-style settings.json config directory. `nil` if this alias does
     /// not use the Claude hooks system (e.g. opencode).
@@ -13,8 +13,6 @@ struct LaunchAlias: Identifiable, Hashable {
 
 enum LaunchCommandResolver {
     static let defaultCommand = "claude"
-    static let ximCommand = "claudexim"
-    static let ximAncestorName = "xim"
     static let codex = "codex"
 
     /// Known launch aliases. For Claude-family aliases, the `claudeConfigDir`
@@ -25,10 +23,6 @@ enum LaunchCommandResolver {
         return [
             LaunchAlias(command: "claude",
                         claudeConfigDir: home.appendingPathComponent(".claude", isDirectory: true)),
-            LaunchAlias(command: "claudexim",
-                        claudeConfigDir: home.appendingPathComponent(".claude-impressit", isDirectory: true)),
-            LaunchAlias(command: "claudeimpressit",
-                        claudeConfigDir: home.appendingPathComponent(".claude-impressit-2", isDirectory: true)),
             LaunchAlias(command: "opencode",
                         claudeConfigDir: nil),
             LaunchAlias(command: "codex", claudeConfigDir: nil)
@@ -65,16 +59,8 @@ enum LaunchCommandResolver {
         aliases.filter(\.supportsClaudeHooks)
     }
 
-    /// Default launch command for a folder.
-    /// Returns `claudexim` if any ancestor directory is named `xim` (case-insensitive).
+    /// All folders use the same default; custom commands are selected explicitly.
     static func defaultCommand(for url: URL) -> String {
-        let components = url.standardizedFileURL.pathComponents
-        guard components.count >= 2 else { return defaultCommand }
-        let ancestors = components.dropLast()
-        let target = ximAncestorName.lowercased()
-        for component in ancestors where component.lowercased() == target {
-            return ximCommand
-        }
         return defaultCommand
     }
 }

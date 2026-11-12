@@ -4,6 +4,7 @@ import Observation
 @MainActor
 @Observable
 final class AppEnvironment {
+    let aliasStore: LaunchAliasStore
     let folderStore: FolderStore
     let sessionManager: SessionManager
     let eventCoordinator: EventCoordinator
@@ -18,8 +19,10 @@ final class AppEnvironment {
 
     init() {
         let store = FolderStore()
-        let stats = StatsStore()
-        let manager = SessionManager(statsStore: stats)
+        let aliases = LaunchAliasStore()
+        self.aliasStore = aliases
+        let stats = StatsStore(aliasesProvider: { aliases.aliases })
+        let manager = SessionManager(statsStore: stats, aliasStore: aliases)
         self.folderStore = store
         self.statsStore = stats
         self.sessionManager = manager
