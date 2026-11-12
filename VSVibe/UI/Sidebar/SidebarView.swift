@@ -1,54 +1,24 @@
 import SwiftUI
 
-struct SidebarView: View {
-    @Environment(AppEnvironment.self) private var env
-    @State private var selection: SidebarRowID?
-
-    private var groups: [SidebarGroup] { env.folderStore.sidebarGroups }
-
-    /// The project behind the current selection, if it still exists.
-    private var selectedFolder: FolderEntry? {
-        guard let selection else { return nil }
-        return env.folderStore.folders.first { $0.id == selection.folderID }
+internal struct SidebarView: View {
+    private enum Layout {
+        static let doubleTapCount = 2
+        static let emptyHintPadding: CGFloat = 2
+        static let footerSpacing: CGFloat = 6
+        static let footerButtonSize: CGFloat = 22
+        static let footerDividerHeight: CGFloat = 14
+        static let footerHorizontalPadding: CGFloat = 8
+        static let footerVerticalPadding: CGFloat = 6
     }
 
-    var body: some View {
+    @Environment(AppEnvironment.self)
+    private var env
+    @State private var selection: SidebarRowID?
+
+    internal var body: some View {
         List(selection: $selection) {
             ForEach(groups) { group in
-                Section(isExpanded: expandedBinding(for: group)) {
-                    ForEach(group.folders) { folder in
-                        SidebarRow(
-                            folder: folder,
-                            labels: env.folderStore.labels(for: folder),
-                            currentLabelID: group.label?.id,
-                            isActive: env.sessionManager.hasSession(forFolder: folder.id),
-                            onOpenOrFocus: { env.openOrFocus(folder: folder) },
-                            onContinue: { env.continueOrFocus(folder: folder) }
-                        )
-                        .tag(SidebarRowID(groupID: group.id, folderID: folder.id))
-                        .contentShape(Rectangle())
-                        .onTapGesture(count: 2) {
-                            env.openOrFocus(folder: folder)
-                        }
-                        .contextMenu {
-                            folderContextMenu(folder)
-                        }
-                    }
-                    .onMove { source, dest in
-                        env.folderStore.move(inGroupWithFolderIDs: group.folders.map(\.id),
-                                             fromOffsets: source,
-                                             toOffset: dest)
-                    }
-                    if group.folders.isEmpty, group.label != nil {
-                        Text("No projects — assign this label from a project's context menu.")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                            .padding(.vertical, 2)
-                    }
-                } header: {
-                    SectionHeader(group: group)
-                        .contextMenu { groupContextMenu(group) }
-                }
+                section(for: group)
             }
         }
         .listStyle(.sidebar)
@@ -79,10 +49,111 @@ struct SidebarView: View {
                 onCancel: { env.cancelLabelEditor() }
             )
         }
-        .sheet(isPresented: Binding(get: { env.isManageLabelsPresented },
-                                    set: { env.isManageLabelsPresented = $0 })) {
+        .sheet(
+            isPresented: Binding(
+                get: { env.isManageLabelsPresented },
+                set: { env.isManageLabelsPresented = $0 }
+            )
+        ) {
             ManageLabelsView { env.isManageLabelsPresented = false }
         }
+    }
+
+    private var groups: [SidebarGroup] { env.folderStore.sidebarGroups }
+
+    /// The project behind the current selection, if it still exists.
+    private var selectedFolder: FolderEntry? {
+        guard let selection else {
+            return nil
+        }
+        return env.folderStore.folders.first { $0.id == selection.folderID }
+    }
+
+    private var sidebarFooter: some View {
+        HStack(spacing: Layout.footerSpacing) {
+            footerButton(systemImage: "plus", label: "New Project") {
+                env.beginCreateProjectFlow()
+            }
+            .help("New Project (⇧⌘O)")
+
+            footerButton(systemImage: "minus", label: "Remove Folder") {
+                if let folder = selectedFolder {
+                    env.removeFolderPermanently(id: folder.id)
+                    selection = nil
+                }
+            }
+            .disabled(selectedFolder == nil)
+            .help("Remove Folder")
+
+            Divider()
+                .frame(height: Layout.footerDividerHeight)
+
+            footerButton(systemImage: "folder.badge.gearshape", label: "Manage Labels") {
+                env.presentManageLabels()
+            }
+            .help("Manage Labels")
+
+            Spacer()
+        }
+        .padding(.horizontal, Layout.footerHorizontalPadding)
+        .padding(.vertical, Layout.footerVerticalPadding)
+        .background(.bar)
+    }
+
+    private func section(for group: SidebarGroup) -> some View {
+        Section(isExpanded: expandedBinding(for: group)) {
+            ForEach(group.folders) { folder in
+                row(for: folder, in: group)
+            }
+            .onMove { source, dest in
+                env.folderStore.move(
+                    inGroupWithFolderIDs: group.folders.map(\.id),
+                    fromOffsets: source,
+                    toOffset: dest
+                )
+            }
+            if group.folders.isEmpty, group.label != nil {
+                Text("No projects — assign this label from a project's context menu.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, Layout.emptyHintPadding)
+            }
+        } header: {
+            SectionHeader(group: group)
+                .contextMenu { groupContextMenu(group) }
+        }
+    }
+
+    private func row(for folder: FolderEntry, in group: SidebarGroup) -> some View {
+        SidebarRow(
+            folder: folder,
+            labels: env.folderStore.labels(for: folder),
+            currentLabelID: group.label?.id,
+            isActive: env.sessionManager.hasSession(forFolder: folder.id),
+            onOpenOrFocus: { env.openOrFocus(folder: folder) },
+            onContinue: { env.continueOrFocus(folder: folder) }
+        )
+        .tag(SidebarRowID(groupID: group.id, folderID: folder.id))
+        .contentShape(Rectangle())
+        .onTapGesture(count: Layout.doubleTapCount) {
+            env.openOrFocus(folder: folder)
+        }
+        .contextMenu {
+            folderContextMenu(folder)
+        }
+    }
+
+    private func footerButton(
+        systemImage: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .frame(width: Layout.footerButtonSize, height: Layout.footerButtonSize)
+                .accessibilityLabel(label)
+        }
+        .buttonStyle(.borderless)
     }
 
     private func expandedBinding(for group: SidebarGroup) -> Binding<Bool> {
@@ -96,49 +167,6 @@ struct SidebarView: View {
                 }
             }
         )
-    }
-
-    private var sidebarFooter: some View {
-        HStack(spacing: 6) {
-            Button {
-                env.beginCreateProjectFlow()
-            } label: {
-                Image(systemName: "plus")
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.borderless)
-            .help("New Project (⇧⌘O)")
-
-            Button {
-                if let folder = selectedFolder {
-                    env.removeFolderPermanently(id: folder.id)
-                    selection = nil
-                }
-            } label: {
-                Image(systemName: "minus")
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.borderless)
-            .disabled(selectedFolder == nil)
-            .help("Remove Folder")
-
-            Divider()
-                .frame(height: 14)
-
-            Button {
-                env.presentManageLabels()
-            } label: {
-                Image(systemName: "folder.badge.gearshape")
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.borderless)
-            .help("Manage Labels")
-
-            Spacer()
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(.bar)
     }
 
     @ViewBuilder
@@ -235,116 +263,6 @@ struct SidebarView: View {
             Button("New Label…") {
                 env.beginCreateLabelFlow(assignTo: folder.id)
             }
-        }
-    }
-}
-
-private struct SectionHeader: View {
-    let group: SidebarGroup
-
-    var body: some View {
-        HStack(spacing: 6) {
-            if let label = group.label {
-                Image(systemName: label.symbolName)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(label.color)
-            }
-            Text(group.title)
-            if !group.folders.isEmpty {
-                Text("\(group.folders.count)")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-    }
-}
-
-private struct SidebarRow: View {
-    let folder: FolderEntry
-    /// Every label on this project, used to hint at cross-section membership.
-    let labels: [ProjectLabel]
-    /// The section this row is rendered in (nil for the unlabelled bucket).
-    let currentLabelID: ProjectLabel.ID?
-    let isActive: Bool
-    let onOpenOrFocus: () -> Void
-    let onContinue: () -> Void
-
-    @State private var isHovering = false
-
-    /// Labels other than the section we're in — the project also appears there.
-    private var otherLabels: [ProjectLabel] {
-        labels.filter { $0.id != currentLabelID }
-    }
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "folder.fill")
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 6) {
-                    Text(folder.displayName)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    if folder.launchCommand != LaunchCommandResolver.defaultCommand {
-                        Text(folder.launchCommand)
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Color.accentColor.opacity(0.18))
-                            .foregroundStyle(Color.accentColor)
-                            .clipShape(Capsule())
-                    }
-                    if !otherLabels.isEmpty {
-                        HStack(spacing: 2) {
-                            ForEach(otherLabels) { label in
-                                Circle()
-                                    .fill(label.color)
-                                    .frame(width: 5, height: 5)
-                            }
-                        }
-                        .help("Also in " + otherLabels.map(\.name).joined(separator: ", "))
-                    }
-                }
-                Text(folder.url.path)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.head)
-            }
-            Spacer(minLength: 0)
-            Circle()
-                .fill(isActive ? Color.green : Color.secondary.opacity(0.3))
-                .frame(width: 6, height: 6)
-            if !isActive {
-                Button {
-                    onContinue()
-                } label: {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 18, height: 18)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.borderless)
-                .opacity(isHovering ? 1.0 : 0.55)
-                .help("Continue Last Session (\(LaunchCommandResolver.continueCommand(for: folder.launchCommand)))")
-            }
-            Button {
-                onOpenOrFocus()
-            } label: {
-                Image(systemName: isActive ? "arrow.up.right.square" : "play.fill")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 18, height: 18)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.borderless)
-            .opacity(isHovering || isActive ? 1.0 : 0.55)
-            .help(isActive ? "Focus Pane" : "Open Pane")
-        }
-        .padding(.vertical, 2)
-        .onHover { hovering in
-            isHovering = hovering
         }
     }
 }

@@ -1,29 +1,38 @@
 @testable import VSVibe
 import XCTest
 
-final class GitInfoTests: XCTestCase {
+internal final class GitInfoTests: XCTestCase {
     private var dirs: [URL] = []
 
-    override func tearDown() {
+    override internal func setUp() {
+        super.setUp()
+        dirs = []
+    }
+
+    override internal func tearDown() {
         dirs.forEach(TestSupport.remove)
         dirs.removeAll()
         super.tearDown()
     }
 
-    private func track(_ url: URL) -> URL { dirs.append(url); return url }
+    @discardableResult
+    private func track(_ url: URL) -> URL {
+        dirs.append(url)
+        return url
+    }
 
-    func testCurrentBranchOnNormalRepo() {
+    internal func testCurrentBranchOnNormalRepo() {
         let repo = track(TestSupport.makeRepo(initialBranch: "main"))
         XCTAssertEqual(GitInfo.currentBranch(forFolder: repo), "main")
     }
 
-    func testCurrentBranchPreservesSlashes() {
+    internal func testCurrentBranchPreservesSlashes() {
         let repo = track(TestSupport.makeRepo())
         TestSupport.git(["switch", "-c", "feature/foo"], in: repo)
         XCTAssertEqual(GitInfo.currentBranch(forFolder: repo), "feature/foo")
     }
 
-    func testDetachedHeadReturnsShortSha() {
+    internal func testDetachedHeadReturnsShortSha() {
         let repo = track(TestSupport.makeRepo())
         let sha = TestSupport.git(["rev-parse", "HEAD"], in: repo).out
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -33,13 +42,13 @@ final class GitInfoTests: XCTestCase {
         XCTAssertEqual(branch?.count, 7)
     }
 
-    func testNonRepoReturnsNil() {
+    internal func testNonRepoReturnsNil() {
         let dir = track(TestSupport.makeTempDir())
         XCTAssertNil(GitInfo.headFileURL(forFolder: dir))
         XCTAssertNil(GitInfo.currentBranch(forFolder: dir))
     }
 
-    func testRepositorySearchStopsAtFilesystemRoot() {
+    internal func testRepositorySearchStopsAtFilesystemRoot() {
         // A background expectation makes a regression fail promptly instead of
         // hanging the test runner's main thread like the original bug.
         let completed = expectation(description: "root search terminates")
@@ -51,14 +60,14 @@ final class GitInfoTests: XCTestCase {
         wait(for: [completed], timeout: 2)
     }
 
-    func testHeadResolvedFromSubdirectory() {
+    internal func testHeadResolvedFromSubdirectory() {
         let repo = track(TestSupport.makeRepo())
         let sub = repo.appendingPathComponent("a/b", isDirectory: true)
         try? FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
         XCTAssertEqual(GitInfo.currentBranch(forFolder: sub), "main")
     }
 
-    func testEmptyMissingAndNonstandardHead() {
+    internal func testEmptyMissingAndNonstandardHead() {
         let repo = track(TestSupport.makeRepo())
         let head = repo.appendingPathComponent(".git/HEAD")
         TestSupport.write("\n", to: head)
@@ -72,17 +81,17 @@ final class GitInfoTests: XCTestCase {
         XCTAssertNil(GitInfo.headFileURL(forFolder: invalid))
     }
 
-    func testWorktreeHeadIndirection() {
+    internal func testWorktreeHeadIndirection() {
         let repo = track(TestSupport.makeRepo())
-        let wt = repo.deletingLastPathComponent()
+        let worktree = repo.deletingLastPathComponent()
             .appendingPathComponent("wt-\(UUID().uuidString)", isDirectory: true)
-        track(wt)
-        TestSupport.git(["worktree", "add", wt.path, "-b", "wtbranch"], in: repo)
+        track(worktree)
+        TestSupport.git(["worktree", "add", worktree.path, "-b", "wtbranch"], in: repo)
         // The worktree's `.git` is a file pointing at the gitdir; HEAD must resolve.
-        XCTAssertEqual(GitInfo.currentBranch(forFolder: wt), "wtbranch")
+        XCTAssertEqual(GitInfo.currentBranch(forFolder: worktree), "wtbranch")
     }
 
-    func testLocalBranches() {
+    internal func testLocalBranches() {
         let repo = track(TestSupport.makeRepo(initialBranch: "main"))
         TestSupport.git(["branch", "dev"], in: repo)
         TestSupport.git(["branch", "release/1.0"], in: repo)
@@ -90,36 +99,40 @@ final class GitInfoTests: XCTestCase {
         XCTAssertEqual(branches, ["main", "dev", "release/1.0"])
     }
 
-    func testLocalBranchesEmptyForNonRepo() {
+    internal func testLocalBranchesEmptyForNonRepo() {
         let dir = track(TestSupport.makeTempDir())
         XCTAssertTrue(GitInfo.localBranches(forFolder: dir).isEmpty)
     }
 
-    func testSwitchBranchSuccess() {
+    internal func testSwitchBranchSuccess() {
         let repo = track(TestSupport.makeRepo())
         TestSupport.git(["branch", "dev"], in: repo)
         let result = GitInfo.switchBranch("dev", forFolder: repo)
-        guard case .success = result else { XCTFail("expected success")
-return }
+        guard case .success = result else {
+            XCTFail("expected success")
+            return
+        }
         XCTAssertEqual(GitInfo.currentBranch(forFolder: repo), "dev")
     }
 
-    func testSwitchBranchFailureSurfacesMessage() {
+    internal func testSwitchBranchFailureSurfacesMessage() {
         let repo = track(TestSupport.makeRepo())
         let result = GitInfo.switchBranch("does-not-exist", forFolder: repo)
-        guard case .failure(let error) = result else { XCTFail("expected failure")
-return }
+        guard case .failure(let error) = result else {
+            XCTFail("expected failure")
+            return
+        }
         XCTAssertFalse(error.message.isEmpty)
     }
 
-    func testCollectStatsOnNonRepo() {
+    internal func testCollectStatsOnNonRepo() {
         let dir = track(TestSupport.makeTempDir())
         let stats = GitInfo.collectStats(forFolder: dir)
         XCTAssertFalse(stats.isRepo)
         XCTAssertEqual(stats.commitsInWindow, 0)
     }
 
-    func testCollectStatsCommitsAndChurn() {
+    internal func testCollectStatsCommitsAndChurn() {
         let repo = track(TestSupport.makeRepo())
         TestSupport.write("line1\nline2\nline3\n", to: repo.appendingPathComponent("file.txt"))
         TestSupport.git(["add", "."], in: repo)
@@ -136,5 +149,9 @@ return }
         // No upstream configured.
         XCTAssertNil(stats.ahead)
         XCTAssertNil(stats.behind)
+    }
+
+    deinit {
+        // Nothing to release; temp dirs are removed in tearDown.
     }
 }

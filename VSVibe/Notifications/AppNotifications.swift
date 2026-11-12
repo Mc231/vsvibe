@@ -3,18 +3,20 @@ import Foundation
 import UserNotifications
 
 @MainActor
-final class AppNotifications: NSObject {
-    static let shared = AppNotifications()
+internal final class AppNotifications: NSObject, HookEventNotifying, UNUserNotificationCenterDelegate {
+    internal static let shared = AppNotifications()
     private var didRequestAuth = false
     private var onActivateSession: ((UUID) -> Void)?
 
-    func configure(onActivateSession: @escaping (UUID) -> Void) {
+    internal func configure(onActivateSession: @escaping (UUID) -> Void) {
         self.onActivateSession = onActivateSession
         UNUserNotificationCenter.current().delegate = self
     }
 
-    func requestAuthorizationIfNeeded() {
-        guard !didRequestAuth else { return }
+    internal func requestAuthorizationIfNeeded() {
+        guard !didRequestAuth else {
+            return
+        }
         didRequestAuth = true
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error {
@@ -24,7 +26,7 @@ final class AppNotifications: NSObject {
         }
     }
 
-    func post(title: String, body: String, sessionID: UUID?) {
+    internal func post(title: String, body: String, sessionID: UUID?) {
         requestAuthorizationIfNeeded()
         let content = UNMutableNotificationContent()
         content.title = title
@@ -40,19 +42,22 @@ final class AppNotifications: NSObject {
             }
         }
     }
-}
 
-extension AppNotifications: UNUserNotificationCenterDelegate {
-    nonisolated func userNotificationCenter(_: UNUserNotificationCenter,
-                                            willPresent _: UNNotification,
-                                            withCompletionHandler completionHandler:
-                                            @escaping (UNNotificationPresentationOptions) -> Void) {
+    // MARK: - UNUserNotificationCenterDelegate
+
+    nonisolated internal func userNotificationCenter(
+        _: UNUserNotificationCenter,
+        willPresent _: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
         completionHandler([.banner, .sound])
     }
 
-    nonisolated func userNotificationCenter(_: UNUserNotificationCenter,
-                                            didReceive response: UNNotificationResponse,
-                                            withCompletionHandler completionHandler: @escaping () -> Void) {
+    nonisolated internal func userNotificationCenter(
+        _: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
         let userInfo = response.notification.request.content.userInfo
         let idString = userInfo["sessionID"] as? String
         Task { @MainActor in
@@ -62,5 +67,9 @@ extension AppNotifications: UNUserNotificationCenterDelegate {
             }
             completionHandler()
         }
+    }
+
+    deinit {
+        // Process-lifetime singleton; nothing to release.
     }
 }

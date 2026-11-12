@@ -1,9 +1,8 @@
-import AppKit
 import Foundation
 import SwiftTerm
 
 extension LocalProcessTerminalView {
-    func spawnShell(at folder: URL) {
+    internal func spawnShell(at folder: URL) {
         let shell = ShellResolver.userLoginShell()
         let env = EnvBuilder.build()
 
@@ -19,7 +18,7 @@ extension LocalProcessTerminalView {
         )
     }
 
-    func injectCommand(_ command: String) {
+    internal func injectCommand(_ command: String) {
         send(txt: "\(command)\n")
     }
 }

@@ -2,38 +2,54 @@
 import XCTest
 
 @MainActor
-final class StatsStoreTests: XCTestCase {
-    private var fileURL: URL!
+internal final class StatsStoreTests: XCTestCase {
     private let folder = URL(fileURLWithPath: "/Users/test/projects/demo")
+    private var directory = TestSupport.placeholderURL
 
-    override func setUp() {
-        super.setUp()
-        fileURL = TestSupport.makeTempDir("stats").appendingPathComponent("stats.json")
+    private var fileURL: URL {
+        directory.appendingPathComponent("stats.json")
     }
 
-    override func tearDown() {
-        TestSupport.remove(fileURL.deletingLastPathComponent())
+    override internal func setUp() {
+        super.setUp()
+        directory = TestSupport.makeTempDir("stats")
+    }
+
+    override internal func tearDown() {
+        TestSupport.remove(directory)
         super.tearDown()
     }
 
-    func testRecordPaneOpened() {
+    private func day(cost: Double, messages: Int, sessions: [String]) -> DayStat {
+        var stat = DayStat()
+        stat.costUSD = cost
+        stat.assistantMessages = messages
+        stat.transcriptSessionIds = sessions
+        return stat
+    }
+
+    internal func testRecordPaneOpened() {
         let store = StatsStore(fileURL: fileURL)
         store.recordPaneOpened(folderURL: folder)
         store.recordPaneOpened(folderURL: folder)
         XCTAssertEqual(store.summary(forFolderURL: folder, window: .today).panesOpened, 2)
     }
 
-    func testScanUsesNewlyRegisteredAliasesAndDeduplicatesConfigDirectories() async throws {
-        let directory = fileURL.deletingLastPathComponent()
+    internal func testScanUsesNewlyRegisteredAliasesAndDeduplicatesConfigDirectories() async throws {
         let aliases = LaunchAliasStore(fileURL: directory.appendingPathComponent("aliases.json"))
         let store = StatsStore(fileURL: fileURL) { aliases.customAliases }
         let config = directory.appendingPathComponent("config")
         let transcripts = TranscriptLocator.projectDir(claudeConfigDir: config, folderURL: folder)
         try FileManager.default.createDirectory(at: transcripts, withIntermediateDirectories: true)
         let line = TestSupport.jsonl([
-            "type": "assistant", "timestamp": "2026-05-22T10:00:00.000Z", "sessionId": "custom-session",
-            "message": ["model": "claude-opus-4-7", "usage": ["input_tokens": 100, "output_tokens": 20],
-                        "content": [["type": "text", "text": "hi"]]]
+            "type": "assistant",
+            "timestamp": "2026-05-22T10:00:00.000Z",
+            "sessionId": "custom-session",
+            "message": [
+                "model": "claude-opus-4-7",
+                "usage": ["input_tokens": 100, "output_tokens": 20],
+                "content": [["type": "text", "text": "hi"]]
+            ]
         ])
         try line.write(to: transcripts.appendingPathComponent("session.jsonl"), atomically: true, encoding: .utf8)
         await store.scanTranscripts(forFolderURL: folder)
@@ -46,7 +62,7 @@ final class StatsStoreTests: XCTestCase {
         XCTAssertEqual(store.summary(forFolderURL: folder, window: .allTime).inputTokens, 100)
     }
 
-    func testRecordActiveTimeIgnoresNonPositive() {
+    internal func testRecordActiveTimeIgnoresNonPositive() {
         let store = StatsStore(fileURL: fileURL)
         store.recordActiveTime(folderURL: folder, seconds: 30)
         store.recordActiveTime(folderURL: folder, seconds: 0)
@@ -54,7 +70,7 @@ final class StatsStoreTests: XCTestCase {
         XCTAssertEqual(store.summary(forFolderURL: folder, window: .today).activeSeconds, 30, accuracy: 0.001)
     }
 
-    func testRecordHookEvents() {
+    internal func testRecordHookEvents() {
         let store = StatsStore(fileURL: fileURL)
         store.recordHookEvent(folderURL: folder, kind: .notification)
         store.recordHookEvent(folderURL: folder, kind: .stop)
@@ -62,34 +78,30 @@ final class StatsStoreTests: XCTestCase {
         store.recordHookEvent(folderURL: folder, kind: .subagentStop)
         store.recordHookEvent(folderURL: folder, kind: .unknown) // no-op
 
-        let s = store.summary(forFolderURL: folder, window: .today)
-        XCTAssertEqual(s.notifications, 1)
-        XCTAssertEqual(s.finishes, 2)
-        XCTAssertEqual(s.subagentFinishes, 1)
+        let summary = store.summary(forFolderURL: folder, window: .today)
+        XCTAssertEqual(summary.notifications, 1)
+        XCTAssertEqual(summary.finishes, 2)
+        XCTAssertEqual(summary.subagentFinishes, 1)
     }
 
-    func testSummaryForUnknownProjectIsEmpty() {
+    internal func testSummaryForUnknownProjectIsEmpty() {
         let store = StatsStore(fileURL: fileURL)
-        let s = store.summary(forFolderURL: folder, window: .allTime)
-        XCTAssertEqual(s.assistantMessages, 0)
-        XCTAssertEqual(s.costUSD, 0)
+        let summary = store.summary(forFolderURL: folder, window: .allTime)
+        XCTAssertEqual(summary.assistantMessages, 0)
+        XCTAssertEqual(summary.costUSD, 0)
     }
 
-    func testWindowFiltering() throws {
+    internal func testWindowFiltering() throws {
         // Seed a stats file with three days at different ages.
-        func day(cost: Double, msgs: Int, sessions: [String]) -> DayStat {
-            var d = DayStat(); d.costUSD = cost; d.assistantMessages = msgs; d.transcriptSessionIds = sessions
-            return d
-        }
-        let cal = Calendar.current
+        let calendar = Calendar.current
         let todayKey = DayKey.today()
-        let threeAgo = DayKey.key(for: cal.date(byAdding: .day, value: -3, to: Date())!)
-        let tenAgo = DayKey.key(for: cal.date(byAdding: .day, value: -10, to: Date())!)
+        let threeAgo = DayKey.key(for: try XCTUnwrap(calendar.date(byAdding: .day, value: -3, to: Date())))
+        let tenAgo = DayKey.key(for: try XCTUnwrap(calendar.date(byAdding: .day, value: -10, to: Date())))
 
         var project = ProjectStat()
-        project.days[todayKey] = day(cost: 1, msgs: 10, sessions: ["a"])
-        project.days[threeAgo] = day(cost: 2, msgs: 20, sessions: ["b"])
-        project.days[tenAgo] = day(cost: 4, msgs: 40, sessions: ["a", "c"])
+        project.days[todayKey] = day(cost: 1, messages: 10, sessions: ["a"])
+        project.days[threeAgo] = day(cost: 2, messages: 20, sessions: ["b"])
+        project.days[tenAgo] = day(cost: 4, messages: 40, sessions: ["a", "c"])
         var state = StatsState()
         state.projects[folder.standardizedFileURL.path] = project
         try JSONEncoder().encode(state).write(to: fileURL)
@@ -106,26 +118,32 @@ final class StatsStoreTests: XCTestCase {
         XCTAssertEqual(store.summary(forFolderURL: folder, window: .last7).distinctSessions, 2)
     }
 
-    func testLoadCorruptFileFallsBackToEmpty() throws {
-        try "not json".data(using: .utf8)!.write(to: fileURL)
+    internal func testLoadCorruptFileFallsBackToEmpty() throws {
+        try Data("not json".utf8).write(to: fileURL)
         let store = StatsStore(fileURL: fileURL)
         XCTAssertEqual(store.summary(forFolderURL: folder, window: .allTime).panesOpened, 0)
     }
 
-    func testPeakContextIsMaxNotSum() throws {
-        let cal = Calendar.current
+    internal func testPeakContextIsMaxNotSum() throws {
+        let calendar = Calendar.current
         let todayKey = DayKey.today()
-        let yesterday = DayKey.key(for: cal.date(byAdding: .day, value: -1, to: Date())!)
+        let yesterday = DayKey.key(for: try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: Date())))
         var project = ProjectStat()
-        var d1 = DayStat(); d1.peakContextTokens = 50_000
-        var d2 = DayStat(); d2.peakContextTokens = 120_000
-        project.days[todayKey] = d1
-        project.days[yesterday] = d2
+        var todayStat = DayStat()
+        todayStat.peakContextTokens = 50_000
+        var yesterdayStat = DayStat()
+        yesterdayStat.peakContextTokens = 120_000
+        project.days[todayKey] = todayStat
+        project.days[yesterday] = yesterdayStat
         var state = StatsState()
         state.projects[folder.standardizedFileURL.path] = project
         try JSONEncoder().encode(state).write(to: fileURL)
 
         let store = StatsStore(fileURL: fileURL)
         XCTAssertEqual(store.summary(forFolderURL: folder, window: .last7).peakContextTokens, 120_000)
+    }
+
+    deinit {
+        // Nothing to release; the temp dir is removed in tearDown.
     }
 }

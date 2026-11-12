@@ -5,38 +5,52 @@ import Observation
 /// toolbar can show it next to the app title.
 @MainActor
 @Observable
-final class DiskSpaceMonitor {
-    private(set) var availableBytes: Int64 = 0
-    private(set) var totalBytes: Int64 = 0
+internal final class DiskSpaceMonitor {
+    private static let formatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        formatter.allowedUnits = [.useGB, .useTB]
+        formatter.includesUnit = true
+        formatter.zeroPadsFractionDigits = false
+        return formatter
+    }()
+
+    internal private(set) var availableBytes: Int64 = 0
+    internal private(set) var totalBytes: Int64 = 0
 
     @ObservationIgnored private var timer: DispatchSourceTimer?
     @ObservationIgnored private let pollInterval: TimeInterval = 15
 
-    init() {
+    internal var availableLabel: String { Self.formatter.string(fromByteCount: availableBytes) }
+    internal var totalLabel: String { Self.formatter.string(fromByteCount: totalBytes) }
+
+    internal init() {
         refresh()
     }
 
-    func start() {
+    internal func start() {
         stop()
-        let t = DispatchSource.makeTimerSource(queue: .main)
-        t.schedule(deadline: .now() + pollInterval, repeating: pollInterval)
-        t.setEventHandler { [weak self] in self?.refresh() }
-        timer = t
-        t.resume()
+        let source = DispatchSource.makeTimerSource(queue: .main)
+        source.schedule(deadline: .now() + pollInterval, repeating: pollInterval)
+        source.setEventHandler { [weak self] in self?.refresh() }
+        timer = source
+        source.resume()
     }
 
-    func stop() {
+    internal func stop() {
         timer?.cancel()
         timer = nil
     }
 
-    func refresh() {
+    internal func refresh() {
         let url = URL(fileURLWithPath: "/")
         let keys: Set<URLResourceKey> = [
             .volumeAvailableCapacityForImportantUsageKey,
             .volumeTotalCapacityKey
         ]
-        guard let values = try? url.resourceValues(forKeys: keys) else { return }
+        guard let values = try? url.resourceValues(forKeys: keys) else {
+            return
+        }
         if let available = values.volumeAvailableCapacityForImportantUsage {
             availableBytes = available
         }
@@ -45,15 +59,7 @@ final class DiskSpaceMonitor {
         }
     }
 
-    var availableLabel: String { Self.formatter.string(fromByteCount: availableBytes) }
-    var totalLabel: String { Self.formatter.string(fromByteCount: totalBytes) }
-
-    private static let formatter: ByteCountFormatter = {
-        let f = ByteCountFormatter()
-        f.countStyle = .file
-        f.allowedUnits = [.useGB, .useTB]
-        f.includesUnit = true
-        f.zeroPadsFractionDigits = false
-        return f
-    }()
+    deinit {
+        // The timer source is cancelled by `stop()`; nothing else to release.
+    }
 }

@@ -1,33 +1,49 @@
 @testable import VSVibe
 import XCTest
 
-final class UsageTrackerTests: XCTestCase {
-    private var config: URL!
-    private var folder: URL!
-    private var transcript: URL!
+internal final class UsageTrackerTests: XCTestCase {
+    private var config = TestSupport.placeholderURL
+    private var line = ""
 
-    override func setUpWithError() throws {
+    private var folder: URL {
+        config.appendingPathComponent("project")
+    }
+
+    private var transcript: URL {
+        TranscriptLocator.projectDir(claudeConfigDir: config, folderURL: folder)
+            .appendingPathComponent("session.jsonl")
+    }
+
+    override internal func setUpWithError() throws {
+        try super.setUpWithError()
         config = TestSupport.makeTempDir()
-        folder = config.appendingPathComponent("project")
         let directory = TranscriptLocator.projectDir(claudeConfigDir: config, folderURL: folder)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        transcript = directory.appendingPathComponent("session.jsonl")
+        line = TestSupport.jsonl([
+            "type": "assistant",
+            "message": [
+                "model": "claude-sonnet-4-6",
+                "usage": [
+                    "input_tokens": 10,
+                    "output_tokens": 5,
+                    "cache_creation_input_tokens": 2,
+                    "cache_read_input_tokens": 3
+                ]
+            ]
+        ])
     }
-    override func tearDown() {
+
+    override internal func tearDown() {
         TestSupport.remove(config)
         super.tearDown()
     }
-    private var line: String {
-        TestSupport.jsonl(["type": "assistant", "message": ["model": "claude-sonnet-4-6", "usage": [
-            "input_tokens": 10, "output_tokens": 5, "cache_creation_input_tokens": 2, "cache_read_input_tokens": 3
-        ]]])
-    }
 
-    func testIncrementalReadIncompleteLinesAndMalformedRecords() throws {
+    internal func testIncrementalReadIncompleteLinesAndMalformedRecords() throws {
         var reader = TranscriptUsageReader(folderURL: folder, configDir: config)
         XCTAssertNil(reader.poll())
-        TestSupport.write("\nnot json\n{}\n{\"type\":\"user\"}\n{\"type\":\"assistant\"}\n" +
-                          "{\"type\":\"assistant\",\"message\":{\"model\":\"test\"}}\n" + line, to: transcript)
+        let malformed = "\nnot json\n{}\n{\"type\":\"user\"}\n{\"type\":\"assistant\"}\n"
+        let modelOnly = "{\"type\":\"assistant\",\"message\":{\"model\":\"test\"}}\n"
+        TestSupport.write(malformed + modelOnly + line, to: transcript)
         let usage = try XCTUnwrap(reader.poll())
         XCTAssertEqual(usage.totalInput, 10)
         XCTAssertEqual(usage.totalOutput, 5)
@@ -46,21 +62,23 @@ final class UsageTrackerTests: XCTestCase {
         XCTAssertEqual(reader.poll()?.messageCount, 2)
     }
 
-    func testLargeTranscriptProcessesBoundedChunksWithoutDoubleCounting() throws {
+    internal func testLargeTranscriptProcessesBoundedChunksWithoutDoubleCounting() throws {
         TestSupport.write(String(repeating: line, count: 4_000), to: transcript)
         var reader = TranscriptUsageReader(folderURL: folder, configDir: config, chunkSize: 4_096)
         var latest = reader.poll()
         XCTAssertTrue(reader.hasMoreData)
         XCTAssertLessThan(try XCTUnwrap(latest).messageCount, 100)
         while reader.hasMoreData {
-            if let update = reader.poll() { latest = update }
+            if let update = reader.poll() {
+                latest = update
+            }
         }
         XCTAssertEqual(latest?.messageCount, 4_000)
         XCTAssertEqual(latest?.totalInput, 40_000)
         XCTAssertNil(reader.poll())
     }
 
-    func testTruncationAndTranscriptRotationResetTotals() throws {
+    internal func testTruncationAndTranscriptRotationResetTotals() throws {
         TestSupport.write(line + line, to: transcript)
         var reader = TranscriptUsageReader(folderURL: folder, configDir: config)
         XCTAssertEqual(reader.poll()?.messageCount, 2)
@@ -68,16 +86,21 @@ final class UsageTrackerTests: XCTestCase {
         XCTAssertEqual(reader.poll()?.messageCount, 1)
         let next = transcript.deletingLastPathComponent().appendingPathComponent("next.jsonl")
         TestSupport.write(line + line + line, to: next)
-        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(10)], ofItemAtPath: next.path)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(10)],
+            ofItemAtPath: next.path
+        )
         XCTAssertEqual(reader.poll()?.messageCount, 3)
     }
 
-    func testMissingUsageFieldsDefaultToZeroAndChunksCanSplitEveryByte() {
+    internal func testMissingUsageFieldsDefaultToZeroAndChunksCanSplitEveryByte() {
         TestSupport.write("{\"type\":\"assistant\",\"message\":{\"usage\":{}}}\n", to: transcript)
         var reader = TranscriptUsageReader(folderURL: folder, configDir: config, chunkSize: 1)
         var latest = reader.poll()
         while reader.hasMoreData {
-            if let update = reader.poll() { latest = update }
+            if let update = reader.poll() {
+                latest = update
+            }
         }
         XCTAssertEqual(latest?.messageCount, 1)
         XCTAssertEqual(latest?.totalInput, 0)
@@ -85,7 +108,7 @@ final class UsageTrackerTests: XCTestCase {
     }
 
     @MainActor
-    func testPollingPublishesOnMainActorAndStopCancels() async {
+    internal func testPollingPublishesOnMainActorAndStopCancels() async {
         TestSupport.write(line, to: transcript)
         let updated = expectation(description: "usage delivered")
         var deliveries = 0
@@ -101,5 +124,9 @@ final class UsageTrackerTests: XCTestCase {
         tracker.stop()
         try? await Task.sleep(nanoseconds: 600_000_000)
         XCTAssertEqual(deliveries, 1)
+    }
+
+    deinit {
+        // Nothing to release; the temp dir is removed in tearDown.
     }
 }

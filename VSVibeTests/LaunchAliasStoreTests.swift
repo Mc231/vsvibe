@@ -2,21 +2,24 @@
 import XCTest
 
 @MainActor
-final class LaunchAliasStoreTests: XCTestCase {
-    private var directory: URL!
-    private var fileURL: URL { directory.appendingPathComponent("aliases.json") }
+internal final class LaunchAliasStoreTests: XCTestCase {
+    private var directory = TestSupport.placeholderURL
 
-    override func setUp() {
+    private var fileURL: URL {
+        directory.appendingPathComponent("aliases.json")
+    }
+
+    override internal func setUp() {
         super.setUp()
         directory = TestSupport.makeTempDir("aliases")
     }
 
-    override func tearDown() {
+    override internal func tearDown() {
         TestSupport.remove(directory)
         super.tearDown()
     }
 
-    func testFreshStoreHasOnlyBuiltIns() {
+    internal func testFreshStoreHasOnlyBuiltIns() {
         let store = LaunchAliasStore(fileURL: fileURL)
         XCTAssertTrue(store.customAliases.isEmpty)
         XCTAssertNil(store.loadError)
@@ -24,7 +27,7 @@ final class LaunchAliasStoreTests: XCTestCase {
         XCTAssertNil(store.alias(for: "unknown"))
     }
 
-    func testSaveNormalizesAndPersistsCustomAlias() throws {
+    internal func testSaveNormalizesAndPersistsCustomAlias() throws {
         let store = LaunchAliasStore(fileURL: fileURL)
         try store.save(command: "  claude-work \n", configPath: " ~/.claude-work ")
         let alias = try XCTUnwrap(store.alias(for: "claude-work --continue"))
@@ -36,7 +39,7 @@ final class LaunchAliasStoreTests: XCTestCase {
         XCTAssertEqual(store.aliases.count, LaunchCommandResolver.aliases.count + 1)
     }
 
-    func testEditRenameAndRemovePersistWithoutReseeding() throws {
+    internal func testEditRenameAndRemovePersistWithoutReseeding() throws {
         let store = LaunchAliasStore(fileURL: fileURL)
         try store.save(command: "work", configPath: "/tmp/first")
         try store.save(command: "other", configPath: "")
@@ -52,7 +55,7 @@ final class LaunchAliasStoreTests: XCTestCase {
         XCTAssertTrue(LaunchAliasStore(fileURL: fileURL).customAliases.isEmpty)
     }
 
-    func testInvalidAndDuplicateEditsLeaveStateAndFileUnchanged() throws {
+    internal func testInvalidAndDuplicateEditsLeaveStateAndFileUnchanged() throws {
         let store = LaunchAliasStore(fileURL: fileURL)
         try store.save(command: "work", configPath: "/tmp/config")
         try store.save(command: "other", configPath: "")
@@ -74,11 +77,15 @@ final class LaunchAliasStoreTests: XCTestCase {
         XCTAssertEqual(store.customAliases.map(\.command), ["work", "other"])
     }
 
-    func testLoadErrorsPreserveOriginalData() throws {
+    internal func testLoadErrorsPreserveOriginalData() throws {
         let duplicate = LaunchAlias(command: "work", claudeConfigDir: nil)
         let invalid = LaunchAlias(command: "claude", claudeConfigDir: nil)
-        for data in [Data("invalid json".utf8), try JSONEncoder().encode([duplicate, duplicate]),
-                     try JSONEncoder().encode([invalid])] {
+        let payloads = [
+            Data("invalid json".utf8),
+            try JSONEncoder().encode([duplicate, duplicate]),
+            try JSONEncoder().encode([invalid])
+        ]
+        for data in payloads {
             try data.write(to: fileURL)
             let store = LaunchAliasStore(fileURL: fileURL)
             XCTAssertNotNil(store.loadError)
@@ -88,27 +95,35 @@ final class LaunchAliasStoreTests: XCTestCase {
         }
     }
 
-    func testPersistenceFailureDoesNotChangeMemory() throws {
+    internal func testPersistenceFailureDoesNotChangeMemory() throws {
         let store = LaunchAliasStore(fileURL: fileURL)
         try FileManager.default.createDirectory(at: fileURL, withIntermediateDirectories: false)
         XCTAssertThrowsError(try store.save(command: "work", configPath: ""))
         XCTAssertTrue(store.customAliases.isEmpty)
     }
 
-    func testCreatesParentDirectory() throws {
+    internal func testCreatesParentDirectory() throws {
         let nested = directory.appendingPathComponent("nested/aliases.json")
         let store = LaunchAliasStore(fileURL: nested)
         try store.save(command: "work", configPath: "")
         XCTAssertEqual(LaunchAliasStore(fileURL: nested).customAliases.map(\.command), ["work"])
     }
 
-    func testErrorsHaveActionableMessages() {
-        let errors: [LaunchAliasStore.AliasError] = [.invalidCommand, .builtInCommand, .duplicateCommand,
-                                                    .invalidConfigPath, .missingAlias, .unreadableFile]
-        for error in errors { XCTAssertFalse(error.localizedDescription.isEmpty) }
+    internal func testErrorsHaveActionableMessages() {
+        let errors: [LaunchAliasStore.AliasError] = [
+            .invalidCommand,
+            .builtInCommand,
+            .duplicateCommand,
+            .invalidConfigPath,
+            .missingAlias,
+            .unreadableFile
+        ]
+        for error in errors {
+            XCTAssertFalse(error.localizedDescription.isEmpty)
+        }
     }
 
-    func testHookStatusUsesRegisteredCustomAliases() throws {
+    internal func testHookStatusUsesRegisteredCustomAliases() throws {
         let store = LaunchAliasStore(fileURL: fileURL)
         try store.save(command: "work", configPath: directory.path)
         try store.save(command: "other", configPath: "")
@@ -120,5 +135,9 @@ final class LaunchAliasStoreTests: XCTestCase {
         XCTAssertEqual(status.aliases.map(\.alias.command), ["work"])
         XCTAssertTrue(try XCTUnwrap(status.aliases.first).isInstalled)
         XCTAssertEqual(HookInstaller.unsupportedAliases(in: store.customAliases).map(\.command), ["other"])
+    }
+
+    deinit {
+        // Nothing to release; the temp dir is removed in tearDown.
     }
 }

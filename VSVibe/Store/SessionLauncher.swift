@@ -1,0 +1,54 @@
+import AppKit
+import Foundation
+import SwiftTerm
+
+/// The process-facing side effects `SessionManager` performs when it opens a
+/// pane. `live` drives SwiftTerm and the real PATH / login shell; tests inject
+/// stand-ins so sessions can be created without spawning shells.
+@MainActor
+internal struct SessionLauncher {
+    private enum Constants {
+        /// Delay before typing the launch command, so the shell has initialized.
+        /// Fixed delay is reliable enough; first PTY paint usually happens within ~150ms.
+        static let commandDelay: TimeInterval = 0.45
+        static let initialWidth: CGFloat = 800
+        static let initialHeight: CGFloat = 600
+    }
+
+    /// SwiftTerm, the user's PATH and login shell.
+    internal static let live = Self(
+        makeTerminalView: Self.makeTerminalView,
+        spawnShell: Self.spawnShell,
+        isOnSearchPath: Self.isOnSearchPath,
+        loginShellCanFind: { command, shell in
+            CommandLocator.loginShellCanFind(command, shell: shell)
+        },
+        commandDelay: Constants.commandDelay
+    )
+
+    /// Creates the (not yet started) terminal view for a new pane.
+    internal var makeTerminalView: () -> LocalProcessTerminalView
+    /// Starts the login shell in `folder` inside the view.
+    internal var spawnShell: (LocalProcessTerminalView, URL) -> Void
+    /// Fast PATH probe for a bare executable name.
+    internal var isOnSearchPath: (String) -> Bool
+    /// Authoritative (slow) check via the login shell: `(command, shell)`.
+    internal var loginShellCanFind: @Sendable (String, String) -> Bool
+    /// Seconds to wait before typing the launch command into the new shell.
+    internal var commandDelay: TimeInterval
+
+    internal static func makeTerminalView() -> LocalProcessTerminalView {
+        let frame = NSRect(x: 0, y: 0, width: Constants.initialWidth, height: Constants.initialHeight)
+        let view = LocalProcessTerminalView(frame: frame)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }
+
+    internal static func spawnShell(in view: LocalProcessTerminalView, at folder: URL) {
+        view.spawnShell(at: folder)
+    }
+
+    internal static func isOnSearchPath(_ command: String) -> Bool {
+        CommandLocator.resolveExecutable(command, searchPaths: EnvBuilder.searchPaths()) != nil
+    }
+}

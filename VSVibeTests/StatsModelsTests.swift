@@ -1,39 +1,42 @@
 @testable import VSVibe
 import XCTest
 
-final class StatsModelsTests: XCTestCase {
+internal final class StatsModelsTests: XCTestCase {
     // MARK: DayKey
 
-    func testTodayMatchesKeyForNow() {
+    internal func testTodayMatchesKeyForNow() {
         XCTAssertEqual(DayKey.today(), DayKey.key(for: Date()))
     }
 
-    func testKeyFormat() {
+    internal func testKeyFormat() throws {
         var comps = DateComponents()
-        comps.year = 2_026; comps.month = 5; comps.day = 9
-        comps.hour = 13; comps.minute = 30
-        let date = Calendar.current.date(from: comps)!
+        comps.year = 2_026
+        comps.month = 5
+        comps.day = 9
+        comps.hour = 13
+        comps.minute = 30
+        let date = try XCTUnwrap(Calendar.current.date(from: comps))
         XCTAssertEqual(DayKey.key(for: date), "2026-05-09")
     }
 
-    func testStartKeyOneDayIsToday() {
+    internal func testStartKeyOneDayIsToday() {
         XCTAssertEqual(DayKey.startKey(daysBack: 1), DayKey.today())
     }
 
-    func testStartKeySevenDays() {
+    internal func testStartKeySevenDays() throws {
         let now = Date()
-        let expected = DayKey.key(for: Calendar.current.date(byAdding: .day, value: -6, to: now)!)
+        let expected = DayKey.key(for: try XCTUnwrap(Calendar.current.date(byAdding: .day, value: -6, to: now)))
         XCTAssertEqual(DayKey.startKey(daysBack: 7, now: now), expected)
     }
 
-    func testDayKeysSortChronologically() {
+    internal func testDayKeysSortChronologically() {
         XCTAssertTrue("2026-05-09" < "2026-05-10")
         XCTAssertTrue("2026-04-30" < "2026-05-01")
     }
 
     // MARK: StatWindow
 
-    func testWindowDays() {
+    internal func testWindowDays() {
         XCTAssertEqual(StatWindow.today.days, 1)
         XCTAssertEqual(StatWindow.last7.days, 7)
         XCTAssertEqual(StatWindow.last30.days, 30)
@@ -42,37 +45,40 @@ final class StatsModelsTests: XCTestCase {
 
     // MARK: StatsSummary
 
-    func testTotalTokens() {
-        var s = StatsSummary()
-        s.inputTokens = 1; s.outputTokens = 2; s.cacheCreationTokens = 3; s.cacheReadTokens = 4
-        XCTAssertEqual(s.totalTokens, 10)
+    internal func testTotalTokens() {
+        var summary = StatsSummary()
+        summary.inputTokens = 1
+        summary.outputTokens = 2
+        summary.cacheCreationTokens = 3
+        summary.cacheReadTokens = 4
+        XCTAssertEqual(summary.totalTokens, 10)
     }
 
-    func testPeakContextPercentCaps() {
-        var s = StatsSummary()
-        s.peakContextTokens = 100_000
-        XCTAssertEqual(s.peakContextPercent, 50, accuracy: 0.001)
-        s.peakContextTokens = 400_000
-        XCTAssertEqual(s.peakContextPercent, 100, accuracy: 0.001)
+    internal func testPeakContextPercentCaps() {
+        var summary = StatsSummary()
+        summary.peakContextTokens = 100_000
+        XCTAssertEqual(summary.peakContextPercent, 50, accuracy: 0.001)
+        summary.peakContextTokens = 400_000
+        XCTAssertEqual(summary.peakContextPercent, 100, accuracy: 0.001)
     }
 
-    func testModelSharesSortedByShare() {
-        var s = StatsSummary()
-        s.modelMessageCounts = ["opus": 3, "sonnet": 1]
-        let shares = s.modelShares
+    internal func testModelSharesSortedByShare() {
+        var summary = StatsSummary()
+        summary.modelMessageCounts = ["opus": 3, "sonnet": 1]
+        let shares = summary.modelShares
         XCTAssertEqual(shares.count, 2)
         XCTAssertEqual(shares[0].model, "opus")
         XCTAssertEqual(shares[0].share, 0.75, accuracy: 0.001)
         XCTAssertEqual(shares[1].share, 0.25, accuracy: 0.001)
     }
 
-    func testModelSharesEmptyWhenNoMessages() {
+    internal func testModelSharesEmptyWhenNoMessages() {
         XCTAssertTrue(StatsSummary().modelShares.isEmpty)
     }
 
     // MARK: Codable round-trip
 
-    func testStatsStateRoundTrip() throws {
+    internal func testStatsStateRoundTrip() throws {
         var day = DayStat()
         day.inputTokens = 42
         day.costUSD = 1.25
@@ -89,21 +95,25 @@ final class StatsModelsTests: XCTestCase {
         let data = try JSONEncoder().encode(state)
         let decoded = try JSONDecoder().decode(StatsState.self, from: data)
 
-        let d = decoded.projects["/Users/test/demo"]?.days["2026-05-22"]
-        XCTAssertEqual(d?.inputTokens, 42)
-        XCTAssertEqual(d?.costUSD, 1.25)
-        XCTAssertEqual(d?.modelMessageCounts["claude-opus-4-7"], 3)
-        XCTAssertEqual(d?.transcriptSessionIds, ["s1", "s2"])
-        XCTAssertEqual(d?.panesOpened, 2)
+        let decodedDay = decoded.projects["/Users/test/demo"]?.days["2026-05-22"]
+        XCTAssertEqual(decodedDay?.inputTokens, 42)
+        XCTAssertEqual(decodedDay?.costUSD, 1.25)
+        XCTAssertEqual(decodedDay?.modelMessageCounts["claude-opus-4-7"], 3)
+        XCTAssertEqual(decodedDay?.transcriptSessionIds, ["s1", "s2"])
+        XCTAssertEqual(decodedDay?.panesOpened, 2)
         XCTAssertEqual(decoded.projects["/Users/test/demo"]?.transcriptBytes["a.jsonl"], 1_234)
     }
 
-    func testDefaultsAreZero() {
+    internal func testDefaultsAreZero() {
         let day = DayStat()
         XCTAssertEqual(day.inputTokens, 0)
         XCTAssertEqual(day.costUSD, 0)
         XCTAssertEqual(day.toolCalls, 0)
         XCTAssertTrue(day.modelMessageCounts.isEmpty)
         XCTAssertEqual(StatsState().version, StatsState.currentVersion)
+    }
+
+    deinit {
+        // Nothing to release.
     }
 }

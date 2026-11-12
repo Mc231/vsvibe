@@ -2,11 +2,13 @@ import AppKit
 import Foundation
 
 @MainActor
-enum AddFolderCommand {
+internal enum AddFolderCommand {
     private static var activePanel: NSOpenPanel?
 
-    static func run(completion: @escaping (URL) -> Void) {
-        guard activePanel == nil else { return }
+    internal static func run(completion: @escaping (URL) -> Void) {
+        guard activePanel == nil else {
+            return
+        }
         let panel = NSOpenPanel()
         activePanel = panel
         panel.canChooseFiles = false
@@ -21,7 +23,9 @@ enum AddFolderCommand {
             let url = response == .OK ? panel.url : nil
             activePanel = nil
             DispatchQueue.main.async {
-                guard let url else { return }
+                guard let url else {
+                    return
+                }
                 completion(url)
             }
         }

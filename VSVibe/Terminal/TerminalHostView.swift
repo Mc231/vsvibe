@@ -2,15 +2,92 @@ import AppKit
 import SwiftTerm
 import SwiftUI
 
-struct TerminalHostView: NSViewRepresentable {
-    let terminalView: LocalProcessTerminalView
-    let onFocusChanged: (Bool) -> Void
+internal struct TerminalHostView: NSViewRepresentable {
+    private enum Appearance {
+        static let fontSize: CGFloat = 12.5
+        static let backgroundRed: CGFloat = 0.07
+        static let backgroundGreen: CGFloat = 0.07
+        static let backgroundBlue: CGFloat = 0.09
+        static let foregroundRed: CGFloat = 0.92
+        static let foregroundGreen: CGFloat = 0.92
+        static let foregroundBlue: CGFloat = 0.94
+        static let opaque: CGFloat = 1.0
+    }
 
-    func makeCoordinator() -> Coordinator {
+    @MainActor
+    internal final class Coordinator {
+        internal var onFocusChanged: (Bool) -> Void
+
+        internal init(onFocusChanged: @escaping (Bool) -> Void) {
+            self.onFocusChanged = onFocusChanged
+        }
+
+        deinit {
+            // Holds only a closure; nothing to tear down.
+        }
+    }
+
+    /// Container that reports whether keyboard focus is inside it.
+    @MainActor
+    internal final class FocusObservingContainerView: NSView {
+        internal var onFocusChanged: ((Bool) -> Void)?
+        private var observer: NSKeyValueObservation?
+        private var hasReportedFocus = false
+        private var reportedFocus = false
+        private var focusCheckScheduled = false
+
+        deinit {
+            observer?.invalidate()
+        }
+
+        override internal func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            observer?.invalidate()
+            observer = nil
+            guard let window else {
+                scheduleFocusCheck()
+                return
+            }
+            observer = window.observe(\.firstResponder, options: [.new]) { [weak self] _, _ in
+                MainActor.assumeIsolated {
+                    self?.scheduleFocusCheck()
+                }
+            }
+            scheduleFocusCheck()
+        }
+
+        private func scheduleFocusCheck() {
+            // AppKit can change firstResponder while SwiftUI is mounting a pane or
+            // dismissing a sheet. Publish after that update, and only on a change.
+            guard !focusCheckScheduled else {
+                return
+            }
+            focusCheckScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else {
+                    return
+                }
+                focusCheckScheduled = false
+                let view = window?.firstResponder as? NSView
+                let focused = view.map { $0 === self || $0.isDescendant(of: self) } ?? false
+                guard !hasReportedFocus || reportedFocus != focused else {
+                    return
+                }
+                hasReportedFocus = true
+                reportedFocus = focused
+                onFocusChanged?(focused)
+            }
+        }
+    }
+
+    internal let terminalView: LocalProcessTerminalView
+    internal let onFocusChanged: (Bool) -> Void
+
+    internal func makeCoordinator() -> Coordinator {
         Coordinator(onFocusChanged: onFocusChanged)
     }
 
-    func makeNSView(context _: Context) -> NSView {
+    internal func makeNSView(context _: Context) -> NSView {
         let container = FocusObservingContainerView()
         container.translatesAutoresizingMaskIntoConstraints = false
         container.onFocusChanged = onFocusChanged
@@ -29,69 +106,28 @@ struct TerminalHostView: NSViewRepresentable {
         return container
     }
 
-    func updateNSView(_ nsView: NSView, context _: Context) {
+    internal func updateNSView(_ nsView: NSView, context _: Context) {
         if let container = nsView as? FocusObservingContainerView {
             container.onFocusChanged = onFocusChanged
         }
     }
 
     private func configureAppearance(_ view: LocalProcessTerminalView) {
-        if let font = NSFont(name: "SF Mono", size: 12.5) ?? NSFont(name: "Menlo", size: 12.5) {
+        if let font = NSFont(name: "SF Mono", size: Appearance.fontSize)
+            ?? NSFont(name: "Menlo", size: Appearance.fontSize) {
             view.font = font
         }
-        view.nativeBackgroundColor = NSColor(calibratedRed: 0.07, green: 0.07, blue: 0.09, alpha: 1.0)
-        view.nativeForegroundColor = NSColor(calibratedRed: 0.92, green: 0.92, blue: 0.94, alpha: 1.0)
-    }
-
-    @MainActor
-    final class Coordinator {
-        var onFocusChanged: (Bool) -> Void
-        init(onFocusChanged: @escaping (Bool) -> Void) {
-            self.onFocusChanged = onFocusChanged
-        }
-    }
-}
-
-@MainActor
-final class FocusObservingContainerView: NSView {
-    var onFocusChanged: ((Bool) -> Void)?
-    private var observer: NSKeyValueObservation?
-    private var reportedFocus: Bool?
-    private var focusCheckScheduled = false
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        observer?.invalidate()
-        observer = nil
-        guard let window else {
-            scheduleFocusCheck()
-            return
-        }
-        observer = window.observe(\.firstResponder, options: [.new]) { [weak self] _, _ in
-            MainActor.assumeIsolated {
-                self?.scheduleFocusCheck()
-            }
-        }
-        scheduleFocusCheck()
-    }
-
-    private func scheduleFocusCheck() {
-        // AppKit can change firstResponder while SwiftUI is mounting a pane or
-        // dismissing a sheet. Publish after that update, and only on a change.
-        guard !focusCheckScheduled else { return }
-        focusCheckScheduled = true
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            focusCheckScheduled = false
-            let view = window?.firstResponder as? NSView
-            let focused = view.map { $0 === self || $0.isDescendant(of: self) } ?? false
-            guard reportedFocus != focused else { return }
-            reportedFocus = focused
-            onFocusChanged?(focused)
-        }
-    }
-
-    deinit {
-        observer?.invalidate()
+        view.nativeBackgroundColor = NSColor(
+            calibratedRed: Appearance.backgroundRed,
+            green: Appearance.backgroundGreen,
+            blue: Appearance.backgroundBlue,
+            alpha: Appearance.opaque
+        )
+        view.nativeForegroundColor = NSColor(
+            calibratedRed: Appearance.foregroundRed,
+            green: Appearance.foregroundGreen,
+            blue: Appearance.foregroundBlue,
+            alpha: Appearance.opaque
+        )
     }
 }

@@ -3,7 +3,12 @@ import Foundation
 /// Polling tail-watcher for `~/.vsvibe/events.jsonl`. New lines are decoded as
 /// `HookEvent` and dispatched on the main actor.
 @MainActor
-final class EventWatcher {
+internal final class EventWatcher {
+    private enum Constants {
+        static let defaultPollInterval: TimeInterval = 0.5
+        static let newline: UInt8 = 0x0A
+    }
+
     private let url: URL
     private let pollInterval: TimeInterval
     private var timer: DispatchSourceTimer?
@@ -11,71 +16,70 @@ final class EventWatcher {
     private var partialLine = Data()
     private let onEvent: (HookEvent) -> Void
 
-    init(url: URL = HookInstaller.eventsFileURL,
-         pollInterval: TimeInterval = 0.5,
-         onEvent: @escaping (HookEvent) -> Void) {
+    /// Whether the poll timer is running.
+    internal var isRunning: Bool { timer != nil }
+
+    internal init(
+        url: URL = HookInstaller.eventsFileURL,
+        pollInterval: TimeInterval = Constants.defaultPollInterval,
+        onEvent: @escaping (HookEvent) -> Void
+    ) {
         self.url = url
         self.pollInterval = pollInterval
         self.onEvent = onEvent
     }
 
-    func start() {
+    /// Starts tailing from the current end of the file (existing lines are skipped).
+    internal func start() {
         stop()
         ensureFileExists()
         offset = currentSize()
-        let t = DispatchSource.makeTimerSource(queue: .main)
-        t.schedule(deadline: .now() + pollInterval, repeating: pollInterval)
-        t.setEventHandler { [weak self] in
+        let pollTimer = DispatchSource.makeTimerSource(queue: .main)
+        pollTimer.schedule(deadline: .now() + pollInterval, repeating: pollInterval)
+        pollTimer.setEventHandler { [weak self] in
             self?.drain()
         }
-        timer = t
-        t.resume()
+        timer = pollTimer
+        pollTimer.resume()
         Log.app.info("EventWatcher started at offset \(self.offset) for \(self.url.path, privacy: .public)")
     }
 
-    func stop() {
+    internal func stop() {
         timer?.cancel()
         timer = nil
     }
 
-    private func ensureFileExists() {
-        let fm = FileManager.default
-        let dir = url.deletingLastPathComponent()
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        if !fm.fileExists(atPath: url.path) {
-            fm.createFile(atPath: url.path, contents: nil)
-        }
-    }
-
-    private func currentSize() -> UInt64 {
-        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
-        return (attrs?[.size] as? NSNumber)?.uint64Value ?? 0
-    }
-
-    private func drain() {
+    /// Reads everything appended since the last call and dispatches each
+    /// complete line. A trailing line without a newline is kept for the next
+    /// call; a file that shrank (truncated or rotated) is re-read from the start.
+    internal func drain() {
         let size = currentSize()
         if size < offset {
             // File was truncated or rotated — reset.
             offset = 0
             partialLine.removeAll()
         }
-        guard size > offset else { return }
-        guard let fh = try? FileHandle(forReadingFrom: url) else { return }
-        defer { try? fh.close() }
+        guard size > offset else {
+            return
+        }
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            return
+        }
+        defer { try? handle.close() }
         do {
-            try fh.seek(toOffset: offset)
+            try handle.seek(toOffset: offset)
         } catch {
             return
         }
-        let chunk = fh.availableData
+        let chunk = handle.availableData
         offset += UInt64(chunk.count)
 
         var buffer = partialLine + chunk
         partialLine.removeAll()
 
-        while let nl = buffer.firstIndex(of: 0x0A) {
-            let lineData = buffer.subdata(in: buffer.startIndex..<nl)
-            buffer.removeSubrange(buffer.startIndex...nl)
+        while let newlineIndex = buffer.firstIndex(of: Constants.newline) {
+            let lineData = buffer.subdata(in: buffer.startIndex..<newlineIndex)
+            buffer.removeSubrange(buffer.startIndex...newlineIndex)
             if let event = parseLine(lineData) {
                 onEvent(event)
             }
@@ -83,14 +87,35 @@ final class EventWatcher {
         partialLine = buffer
     }
 
+    private func ensureFileExists() {
+        let fileManager = FileManager.default
+        let dir = url.deletingLastPathComponent()
+        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        if !fileManager.fileExists(atPath: url.path) {
+            fileManager.createFile(atPath: url.path, contents: nil)
+        }
+    }
+
+    private func currentSize() -> UInt64 {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return (attrs?[.size] as? UInt64) ?? 0
+    }
+
     private func parseLine(_ data: Data) -> HookEvent? {
-        guard !data.isEmpty else { return nil }
+        guard !data.isEmpty else {
+            return nil
+        }
         do {
             return try JSONDecoder().decode(HookEvent.self, from: data)
         } catch {
-            let str = String(data: data, encoding: .utf8) ?? "<binary>"
-            Log.app.error("EventWatcher: failed to parse line: \(str, privacy: .public) error=\(String(describing: error), privacy: .public)")
+            let text = String(bytes: data, encoding: .utf8) ?? "<binary>"
+            let detail = "failed to parse line: \(text) error=\(String(describing: error))"
+            Log.app.error("EventWatcher: \(detail, privacy: .public)")
             return nil
         }
+    }
+
+    deinit {
+        // The timer handler captures self weakly; nothing else to release.
     }
 }

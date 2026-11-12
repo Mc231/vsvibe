@@ -1,71 +1,54 @@
 import Foundation
 
-enum HookEventKind: String, Codable {
-    case stop = "Stop"
-    case notification = "Notification"
-    case subagentStop = "SubagentStop"
-    case unknown
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let raw = try container.decode(String.self)
-        self = Self(rawValue: raw) ?? .unknown
+internal struct HookEvent: Codable, Identifiable {
+    private enum CodingKeys: String, CodingKey {
+        case event = "event"
+        case message = "message"
+        case payload = "payload"
+        case projectDir = "projectDir"
+        case timestamp = "ts"
     }
 
-    var displayName: String {
-        switch self {
-        case .stop: "Claude finished"
-        case .notification: "Claude needs input"
-        case .subagentStop: "Subagent finished"
-        case .unknown: "Claude event"
-        }
-    }
-}
-
-struct HookEvent: Codable, Identifiable {
-    let id: UUID
-    let event: HookEventKind
-    let projectDir: String
-    let ts: TimeInterval
-    let message: String?
-
-    enum CodingKeys: String, CodingKey {
-        case event, projectDir, ts, payload, message
+    /// Subset of the JSON payload Claude passes on stdin to hook commands.
+    private struct HookPayload: Codable {
+        let message: String?
     }
 
-    init(event: HookEventKind, projectDir: String, ts: TimeInterval, message: String?) {
+    internal let id: UUID
+    internal let event: HookEventKind
+    internal let projectDir: String
+    /// Seconds since 1970 (the `ts` field written by the hook script).
+    internal let timestamp: TimeInterval
+    internal let message: String?
+
+    internal init(event: HookEventKind, projectDir: String, timestamp: TimeInterval, message: String?) {
         self.id = UUID()
         self.event = event
         self.projectDir = projectDir
-        self.ts = ts
+        self.timestamp = timestamp
         self.message = message
     }
 
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
+    internal init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = UUID()
-        self.event = (try? c.decode(HookEventKind.self, forKey: .event)) ?? .unknown
-        self.projectDir = (try? c.decode(String.self, forKey: .projectDir)) ?? ""
-        self.ts = (try? c.decode(TimeInterval.self, forKey: .ts)) ?? Date().timeIntervalSince1970
-        if let msg = try? c.decode(String.self, forKey: .message) {
-            self.message = msg
-        } else if let payload = try? c.decode(HookPayload.self, forKey: .payload) {
+        self.event = (try? container.decode(HookEventKind.self, forKey: .event)) ?? .unknown
+        self.projectDir = (try? container.decode(String.self, forKey: .projectDir)) ?? ""
+        self.timestamp = (try? container.decode(TimeInterval.self, forKey: .timestamp)) ?? Date().timeIntervalSince1970
+        if let message = try? container.decode(String.self, forKey: .message) {
+            self.message = message
+        } else if let payload = try? container.decode(HookPayload.self, forKey: .payload) {
             self.message = payload.message
         } else {
             self.message = nil
         }
     }
 
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(event.rawValue, forKey: .event)
-        try c.encode(projectDir, forKey: .projectDir)
-        try c.encode(ts, forKey: .ts)
-        try c.encodeIfPresent(message, forKey: .message)
+    internal func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(event.rawValue, forKey: .event)
+        try container.encode(projectDir, forKey: .projectDir)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encodeIfPresent(message, forKey: .message)
     }
-}
-
-/// Subset of the JSON payload Claude passes on stdin to hook commands.
-private struct HookPayload: Codable {
-    let message: String?
 }

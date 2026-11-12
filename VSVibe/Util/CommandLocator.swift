@@ -4,16 +4,20 @@ import Foundation
 /// explicit PATH list (the same one `EnvBuilder` hands the spawned shell); the
 /// slow check asks the user's login shell, which also sees rc-managed paths
 /// (nvm, asdf, …) the app itself doesn't inherit.
-enum CommandLocator {
+internal enum CommandLocator {
     /// Absolute path of `command` resolved against `searchPaths`, or nil when
     /// not found. `command` must be a bare executable token (no arguments) —
     /// strip flags with `LaunchCommandResolver.baseCommand(of:)` first.
-    static func resolveExecutable(_ command: String,
-                                  searchPaths: [String],
-                                  fileManager: FileManager = .default) -> String? {
-        guard !command.isEmpty else { return nil }
+    internal static func resolveExecutable(
+        _ command: String,
+        searchPaths: [String],
+        fileManager: FileManager = .default
+    ) -> String? {
+        guard !command.isEmpty else {
+            return nil
+        }
         if command.contains("/") {
-            let path = (command as NSString).expandingTildeInPath
+            let path = expandingTilde(in: command)
             return fileManager.isExecutableFile(atPath: path) ? path : nil
         }
         for dir in searchPaths where !dir.isEmpty {
@@ -29,16 +33,31 @@ enum CommandLocator {
     /// (`<shell> -l -c "command -v <command>"`). Runs the shell's rc files, so
     /// it is slow — only call off the main thread, in response to a user
     /// action, and only after `resolveExecutable` came up empty.
-    static func loginShellCanFind(_ command: String, shell: String) -> Bool {
-        guard !command.isEmpty, !command.contains("'") else { return false }
+    internal static func loginShellCanFind(_ command: String, shell: String) -> Bool {
+        guard !command.isEmpty, !command.contains("'") else {
+            return false
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
         process.arguments = ["-l", "-c", "command -v '\(command)' >/dev/null 2>&1"]
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
-        do { try process.run() } catch { return false }
+        do {
+            try process.run()
+        } catch {
+            return false
+        }
         process.waitUntilExit()
         return process.terminationStatus == 0
+    }
+
+    /// Swift-native equivalent of `NSString.expandingTildeInPath` for the
+    /// current user (`~` and `~/…`); other paths are returned unchanged.
+    private static func expandingTilde(in path: String) -> String {
+        guard path == "~" || path.hasPrefix("~/") else {
+            return path
+        }
+        return NSHomeDirectory() + path.dropFirst()
     }
 }

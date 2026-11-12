@@ -2,11 +2,15 @@ import SwiftUI
 
 /// A compact menu button that lists every installed editor and opens
 /// `folder` in the chosen one.
-struct OpenInMenu: View {
-    let folder: URL
-    var compact: Bool = true
+internal struct OpenInMenu: View {
+    private enum Layout {
+        static let compactIconSize: CGFloat = 10
+    }
 
-    var body: some View {
+    internal let folder: URL
+    internal var compact: Bool = true
+
+    internal var body: some View {
         Menu {
             ForEach(EditorRegistry.availableEditors()) { editor in
                 Button {
@@ -22,7 +26,8 @@ struct OpenInMenu: View {
         } label: {
             if compact {
                 Image(systemName: "arrow.up.forward.app")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: Layout.compactIconSize, weight: .semibold))
+                    .accessibilityLabel("Open In")
             } else {
                 Label("Open In", systemImage: "arrow.up.forward.app")
             }

@@ -10,6 +10,10 @@
 #   explicit_type_interface       contradicts redundant_type_annotation
 #   no_extension_access_modifier  contradicts extension_access_modifier
 #   prefer_nimble                 needs Nimble; tests use XCTest only
+#
+# The ONLY inline suppression allowed in the codebase: VSVibeApp.appDelegate
+# (`swiftlint:disable:this unused_declaration`). SwiftUI installs the
+# @NSApplicationDelegateAdaptor by reflection, which the analyzer cannot see.
 
 included:
   - VSVibe

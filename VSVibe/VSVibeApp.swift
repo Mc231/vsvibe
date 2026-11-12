@@ -1,27 +1,30 @@
-import AppKit
 import SwiftUI
 
 @main
-struct VSVibeApp: App {
-    @State private var env = AppEnvironment()
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-
-    init() {
-        // Don't let macOS restore stale windows that would duplicate panes.
-        UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+internal struct VSVibeApp: App {
+    private enum Layout {
+        static let minWindowWidth: CGFloat = 900
+        static let minWindowHeight: CGFloat = 600
     }
 
-    var body: some Scene {
+    @State private var env = AppEnvironment()
+    // SwiftUI installs the delegate by reflection; the analyzer can't see that.
+    @NSApplicationDelegateAdaptor(AppDelegate.self)
+    private var appDelegate // swiftlint:disable:this unused_declaration
+
+    internal var body: some Scene {
         WindowGroup("VSVibe") {
             RootSplitView()
                 .environment(env)
-                .frame(minWidth: 900, minHeight: 600)
+                .frame(minWidth: Layout.minWindowWidth, minHeight: Layout.minWindowHeight)
                 .task {
                     env.startEventStream()
                 }
-                .sheet(isPresented: Binding(
-                    get: { env.isHookSetupPresented },
-                    set: { env.isHookSetupPresented = $0 })
+                .sheet(
+                    isPresented: Binding(
+                        get: { env.isHookSetupPresented },
+                        set: { env.isHookSetupPresented = $0 }
+                    )
                 ) {
                     HookSetupView(aliasStore: env.aliasStore) { env.isHookSetupPresented = false }
                 }
@@ -29,62 +32,59 @@ struct VSVibeApp: App {
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .commands {
-            CommandGroup(replacing: .newItem) {}
-            CommandGroup(after: .newItem) {
-                Button("New Project…") {
-                    env.beginCreateProjectFlow()
-                }
-                .keyboardShortcut("o", modifiers: [.command, .shift])
-                Divider()
-                Button("Open All Shortcuts") {
-                    env.openAllShortcuts()
-                }
-                .keyboardShortcut("a", modifiers: [.command, .shift])
-                Button("Close All Panes") {
-                    env.closeAllPanes()
-                }
-                .keyboardShortcut("w", modifiers: [.command, .shift])
+            CommandGroup(replacing: .newItem) {
+                // Hide the default "New Window" item.
             }
+            fileCommands
             CommandGroup(after: .appSettings) {
                 Button("Aliases & Claude Hooks…") {
                     env.presentHookSetup()
                 }
             }
-            CommandMenu("Open In") {
-                ForEach(EditorRegistry.availableEditors()) { editor in
-                    Button {
-                        env.openFocusedInEditor(editor)
-                    } label: {
-                        Label(editor.displayName, systemImage: editor.iconSystemName)
-                    }
-                    .modifier(OptionalShortcut(key: editor.shortcutKey, modifiers: editor.shortcutModifiers))
-                    .disabled(env.focusedFolderURL == nil)
-                }
-                if EditorRegistry.availableEditors().isEmpty {
-                    Text("No supported editors detected")
-                }
+            openInCommands
+            CommandGroup(replacing: .help) {
+                // No help book.
             }
-            CommandGroup(replacing: .help) {}
         }
     }
-}
 
-@MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool {
-        true
-    }
-}
-
-private struct OptionalShortcut: ViewModifier {
-    let key: String?
-    let modifiers: EventModifiers
-
-    func body(content: Content) -> some View {
-        if let key, let char = key.first {
-            content.keyboardShortcut(KeyEquivalent(char), modifiers: modifiers)
-        } else {
-            content
+    @CommandsBuilder private var fileCommands: some Commands {
+        CommandGroup(after: .newItem) {
+            Button("New Project…") {
+                env.beginCreateProjectFlow()
+            }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
+            Divider()
+            Button("Open All Shortcuts") {
+                env.openAllShortcuts()
+            }
+            .keyboardShortcut("a", modifiers: [.command, .shift])
+            Button("Close All Panes") {
+                env.closeAllPanes()
+            }
+            .keyboardShortcut("w", modifiers: [.command, .shift])
         }
+    }
+
+    @CommandsBuilder private var openInCommands: some Commands {
+        CommandMenu("Open In") {
+            ForEach(EditorRegistry.availableEditors()) { editor in
+                Button {
+                    env.openFocusedInEditor(editor)
+                } label: {
+                    Label(editor.displayName, systemImage: editor.iconSystemName)
+                }
+                .modifier(OptionalShortcut(key: editor.shortcutKey, modifiers: editor.shortcutModifiers))
+                .disabled(env.focusedFolderURL == nil)
+            }
+            if EditorRegistry.availableEditors().isEmpty {
+                Text("No supported editors detected")
+            }
+        }
+    }
+
+    internal init() {
+        // Don't let macOS restore stale windows that would duplicate panes.
+        UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
     }
 }

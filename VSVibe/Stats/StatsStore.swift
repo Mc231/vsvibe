@@ -7,39 +7,84 @@ import Observation
 /// long scan can never clobber concurrently-recorded runtime fields.
 @MainActor
 @Observable
-final class StatsStore {
-    private(set) var state: StatsState
+internal final class StatsStore {
+    private enum Constants {
+        static let saveDebounceInterval: TimeInterval = 0.7
+    }
+
+    internal private(set) var state: StatsState
 
     @ObservationIgnored private let fileURL: URL
-    @ObservationIgnored private let saveDebouncer = Debouncer(interval: 0.7)
+    @ObservationIgnored private let saveDebouncer = Debouncer(interval: Constants.saveDebounceInterval)
 
     @ObservationIgnored private let aliasesProvider: () -> [LaunchAlias]
 
-    init(fileURL: URL = AppPaths.statsFile,
-         aliasesProvider: @escaping () -> [LaunchAlias] = { LaunchCommandResolver.aliases }) {
+    internal init(
+        fileURL: URL = AppPaths.statsFile,
+        aliasesProvider: @escaping () -> [LaunchAlias] = { LaunchCommandResolver.aliases }
+    ) {
         self.aliasesProvider = aliasesProvider
         self.fileURL = fileURL
         self.state = Self.read(from: fileURL)
     }
 
+    // MARK: - Persistence helpers
+
+    private static func key(for folderURL: URL) -> String {
+        folderURL.standardizedFileURL.path
+    }
+
+    private static func read(from url: URL) -> StatsState {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return StatsState()
+        }
+        do {
+            let data = try Data(contentsOf: url)
+            return try JSONDecoder().decode(StatsState.self, from: data)
+        } catch {
+            Log.store.error("Failed to load stats: \(String(describing: error), privacy: .public)")
+            return StatsState()
+        }
+    }
+
+    private static func write(_ state: StatsState, to url: URL) {
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            let data = try encoder.encode(state)
+            try data.write(to: url, options: [.atomic])
+        } catch {
+            Log.store.error("Failed to save stats: \(String(describing: error), privacy: .public)")
+        }
+    }
+
     // MARK: - Runtime recording
 
-    func recordPaneOpened(folderURL: URL) {
+    internal func recordPaneOpened(folderURL: URL) {
         mutateToday(folderURL) { $0.panesOpened += 1 }
     }
 
-    func recordActiveTime(folderURL: URL, seconds: Double) {
-        guard seconds > 0 else { return }
+    internal func recordActiveTime(folderURL: URL, seconds: Double) {
+        guard seconds > 0 else {
+            return
+        }
         mutateToday(folderURL) { $0.activeSeconds += seconds }
     }
 
-    func recordHookEvent(folderURL: URL, kind: HookEventKind) {
+    internal func recordHookEvent(folderURL: URL, kind: HookEventKind) {
         mutateToday(folderURL) { day in
             switch kind {
-            case .notification: day.notifications += 1
-            case .stop: day.finishes += 1
-            case .subagentStop: day.subagentFinishes += 1
-            case .unknown: break
+            case .notification:
+                day.notifications += 1
+
+            case .stop:
+                day.finishes += 1
+
+            case .subagentStop:
+                day.subagentFinishes += 1
+
+            case .unknown:
+                break
             }
         }
     }
@@ -49,7 +94,7 @@ final class StatsStore {
     /// Incrementally folds new transcript bytes for `folderURL` into the store.
     /// File reading/parsing happens off the main actor; only an additive delta
     /// is applied here.
-    func scanTranscripts(forFolderURL folderURL: URL) async {
+    internal func scanTranscripts(forFolderURL folderURL: URL) async {
         let path = Self.key(for: folderURL)
         let configDirs = Array(Set(aliasesProvider().compactMap(\.claudeConfigDir)))
         let offsets = state.projects[path]?.transcriptBytes ?? [:]
@@ -66,9 +111,11 @@ final class StatsStore {
 
     // MARK: - Queries
 
-    func summary(forFolderURL folderURL: URL, window: StatWindow) -> StatsSummary {
+    internal func summary(forFolderURL folderURL: URL, window: StatWindow) -> StatsSummary {
         var summary = StatsSummary()
-        guard let stat = state.projects[Self.key(for: folderURL)] else { return summary }
+        guard let stat = state.projects[Self.key(for: folderURL)] else {
+            return summary
+        }
 
         let dayKeys: [String]
         if let days = window.days {
@@ -80,7 +127,9 @@ final class StatsStore {
 
         var sessions = Set<String>()
         for key in dayKeys {
-            guard let day = stat.days[key] else { continue }
+            guard let day = stat.days[key] else {
+                continue
+            }
             summary.costUSD += day.costUSD
             summary.inputTokens += day.inputTokens
             summary.outputTokens += day.outputTokens
@@ -120,31 +169,27 @@ final class StatsStore {
     private func merge(delta: ProjectStat, into path: String) {
         var stat = state.projects[path] ?? ProjectStat()
         stat.transcriptBytes = delta.transcriptBytes // scan advances offsets authoritatively
-        for (key, d) in delta.days {
+        for (key, deltaDay) in delta.days {
             var day = stat.days[key] ?? DayStat()
-            day.inputTokens += d.inputTokens
-            day.outputTokens += d.outputTokens
-            day.cacheCreationTokens += d.cacheCreationTokens
-            day.cacheReadTokens += d.cacheReadTokens
-            day.costUSD += d.costUSD
-            day.assistantMessages += d.assistantMessages
-            day.toolCalls += d.toolCalls
-            for (model, count) in d.modelMessageCounts {
+            day.inputTokens += deltaDay.inputTokens
+            day.outputTokens += deltaDay.outputTokens
+            day.cacheCreationTokens += deltaDay.cacheCreationTokens
+            day.cacheReadTokens += deltaDay.cacheReadTokens
+            day.costUSD += deltaDay.costUSD
+            day.assistantMessages += deltaDay.assistantMessages
+            day.toolCalls += deltaDay.toolCalls
+            for (model, count) in deltaDay.modelMessageCounts {
                 day.modelMessageCounts[model, default: 0] += count
             }
-            day.peakContextTokens = max(day.peakContextTokens, d.peakContextTokens)
-            day.highContextMessages += d.highContextMessages
-            for sid in d.transcriptSessionIds where !day.transcriptSessionIds.contains(sid) {
-                day.transcriptSessionIds.append(sid)
+            day.peakContextTokens = max(day.peakContextTokens, deltaDay.peakContextTokens)
+            day.highContextMessages += deltaDay.highContextMessages
+            for sessionId in deltaDay.transcriptSessionIds where !day.transcriptSessionIds.contains(sessionId) {
+                day.transcriptSessionIds.append(sessionId)
             }
             stat.days[key] = day
         }
         state.projects[path] = stat
         scheduleSave()
-    }
-
-    private static func key(for folderURL: URL) -> String {
-        folderURL.standardizedFileURL.path
     }
 
     private func scheduleSave() {
@@ -155,25 +200,7 @@ final class StatsStore {
         }
     }
 
-    private static func read(from url: URL) -> StatsState {
-        guard FileManager.default.fileExists(atPath: url.path) else { return StatsState() }
-        do {
-            let data = try Data(contentsOf: url)
-            return try JSONDecoder().decode(StatsState.self, from: data)
-        } catch {
-            Log.store.error("Failed to load stats: \(String(describing: error), privacy: .public)")
-            return StatsState()
-        }
-    }
-
-    private static func write(_ state: StatsState, to url: URL) {
-        do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.sortedKeys]
-            let data = try encoder.encode(state)
-            try data.write(to: url, options: [.atomic])
-        } catch {
-            Log.store.error("Failed to save stats: \(String(describing: error), privacy: .public)")
-        }
+    deinit {
+        // Pending saves are owned by the debouncer's work item; nothing to release.
     }
 }

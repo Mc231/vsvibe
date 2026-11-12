@@ -1,21 +1,33 @@
 import Darwin
 import Foundation
 
-enum ShellResolver {
-    static func userLoginShell() -> String {
-        if let pw = getpwuid(getuid()), let shellPtr = pw.pointee.pw_shell {
-            let path = String(cString: shellPtr)
-            if !path.isEmpty {
-                return path
-            }
-        }
-        if let envShell = ProcessInfo.processInfo.environment["SHELL"], !envShell.isEmpty {
-            return envShell
-        }
-        return "/bin/zsh"
+internal enum ShellResolver {
+    private static let fallbackShell = "/bin/zsh"
+
+    /// The user's login shell: the passwd entry first, then `$SHELL`, then zsh.
+    internal static func userLoginShell() -> String {
+        resolveShell(passwdShell: passwdShell(), environment: ProcessInfo.processInfo.environment)
     }
 
-    static func loginArgs(for _: String) -> [String] {
+    /// Pure resolution order behind `userLoginShell()`; empty values are skipped.
+    internal static func resolveShell(passwdShell: String?, environment: [String: String]) -> String {
+        if let passwdShell, !passwdShell.isEmpty {
+            return passwdShell
+        }
+        if let envShell = environment["SHELL"], !envShell.isEmpty {
+            return envShell
+        }
+        return fallbackShell
+    }
+
+    internal static func loginArgs(for _: String) -> [String] {
         ["-l"]
+    }
+
+    private static func passwdShell() -> String? {
+        guard let entry = getpwuid(getuid()), let shellPointer = entry.pointee.pw_shell else {
+            return nil
+        }
+        return String(cString: shellPointer)
     }
 }

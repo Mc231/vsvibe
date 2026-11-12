@@ -1,12 +1,21 @@
 import SwiftUI
 
-struct PaneView: View {
-    @Environment(AppEnvironment.self) private var env
-    let session: TerminalSession
+internal struct PaneView: View {
+    private enum Layout {
+        static let cornerRadius: CGFloat = 6
+        static let idleBorderOpacity: Double = 0.08
+        static let focusedBorderWidth: CGFloat = 2
+        static let idleBorderWidth: CGFloat = 1
+        static let outerPadding: CGFloat = 2
+    }
+
+    @Environment(AppEnvironment.self)
+    private var env
+    internal let session: TerminalSession
 
     @State private var isFocused: Bool = false
 
-    var body: some View {
+    internal var body: some View {
         VStack(spacing: 0) {
             PaneChromeView(
                 session: session,
@@ -32,46 +41,13 @@ struct PaneView: View {
         }
         .background(Color.black)
         .overlay(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: Layout.cornerRadius)
                 .strokeBorder(
-                    isFocused ? Color.accentColor : Color.white.opacity(0.08),
-                    lineWidth: isFocused ? 2 : 1
+                    isFocused ? Color.accentColor : Color.white.opacity(Layout.idleBorderOpacity),
+                    lineWidth: isFocused ? Layout.focusedBorderWidth : Layout.idleBorderWidth
                 )
         )
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .padding(2)
-    }
-}
-
-private struct PaneWarningBanner: View {
-    let message: String
-    let onEditProject: () -> Void
-    let onDismiss: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(.yellow)
-            Text(message)
-                .font(.system(size: 11))
-                .foregroundStyle(.white)
-                .lineLimit(2)
-            Spacer(minLength: 4)
-            Button("Edit Project…", action: onEditProject)
-                .buttonStyle(.borderless)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.yellow)
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            .buttonStyle(.plain)
-            .help("Dismiss")
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Color.yellow.opacity(0.14))
+        .clipShape(RoundedRectangle(cornerRadius: Layout.cornerRadius))
+        .padding(Layout.outerPadding)
     }
 }

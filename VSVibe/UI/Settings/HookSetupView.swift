@@ -1,9 +1,25 @@
-import AppKit
 import SwiftUI
 
-struct HookSetupView: View {
-    let aliasStore: LaunchAliasStore
-    let onClose: () -> Void
+internal struct HookSetupView: View {
+    private enum Layout {
+        static let width: CGFloat = 620
+        static let height: CGFloat = 650
+        static let headerSpacing: CGFloat = 10
+        static let titleSpacing: CGFloat = 2
+        static let horizontalPadding: CGFloat = 20
+        static let headerVerticalPadding: CGFloat = 14
+        static let contentSpacing: CGFloat = 14
+        static let contentVerticalPadding: CGFloat = 18
+        static let footerVerticalPadding: CGFloat = 12
+        static let topPadding: CGFloat = 4
+        static let statusIconSize: CGFloat = 16
+        static let statusLabelSize: CGFloat = 12
+        static let statusDetailSize: CGFloat = 11
+        static let statusDetailLineLimit = 2
+    }
+
+    internal let aliasStore: LaunchAliasStore
+    internal let onClose: () -> Void
 
     @State private var status = HookInstaller.Status(scriptInstalled: false, aliases: [])
     @State private var lastMessage: String?
@@ -11,15 +27,15 @@ struct HookSetupView: View {
     @State private var isAliasEditorPresented = false
     @State private var editingAlias: LaunchAlias?
 
-    var body: some View {
+    internal var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
-            ScrollView { body_ }
+            ScrollView { content }
             Divider()
             footer
         }
-        .frame(width: 620, height: 650)
+        .frame(width: Layout.width, height: Layout.height)
         .onAppear { refreshStatus() }
         .onChange(of: aliasStore.customAliases) { refreshStatus() }
         .sheet(isPresented: $isAliasEditorPresented) {
@@ -28,11 +44,12 @@ struct HookSetupView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Layout.headerSpacing) {
             Image(systemName: "bell.badge.fill")
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
-            VStack(alignment: .leading, spacing: 2) {
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Layout.titleSpacing) {
                 Text("Aliases & Claude Hooks")
                     .font(.headline)
                 Text("Notify VSVibe when any Claude alias finishes or needs input.")
@@ -41,94 +58,94 @@ struct HookSetupView: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Layout.headerVerticalPadding)
     }
 
-    private var body_: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Custom aliases").font(.headline)
-                Spacer()
-                Button("Add Alias…", systemImage: "plus") {
-                    editingAlias = nil
-                    isAliasEditorPresented = true
-                }
-                .disabled(aliasStore.loadError != nil)
-            }
-            Text("Register a command or alias already available in your shell. Add its Claude config directory to enable hooks and usage tracking.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if let error = aliasStore.loadError {
-                Text(error).font(.caption).foregroundStyle(.red)
-            } else if aliasStore.customAliases.isEmpty {
-                Text("No custom aliases yet.").font(.caption).foregroundStyle(.secondary)
-            }
-            ForEach(aliasStore.customAliases) { alias in
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(alias.command).font(.system(.body, design: .monospaced))
-                        Text(alias.claudeConfigDir?.path ?? "No Claude config directory")
-                            .font(.caption).foregroundStyle(.secondary)
-                            .lineLimit(1).truncationMode(.middle)
-                    }
-                    Spacer()
-                    Button("Edit") {
-                        editingAlias = alias
-                        isAliasEditorPresented = true
-                    }
-                    Button("Remove", role: .destructive) {
-                        runOperation("Removed alias. Existing project commands are unchanged.") {
-                            try aliasStore.remove(command: alias.command)
-                        }
-                    }
-                }
-            }
+    private var content: some View {
+        VStack(alignment: .leading, spacing: Layout.contentSpacing) {
+            aliasesSection
             Divider()
-            Text("Hook status").font(.headline)
-            statusBlock(
-                label: "Hook script",
-                detail: HookInstaller.hookScriptURL.path,
-                ok: status.scriptInstalled
-            )
-
-            ForEach(status.aliases) { aliasStatus in
-                let path = aliasStatus.alias.settingsURL?.path ?? "(no config)"
-                statusBlock(
-                    label: "\(aliasStatus.alias.command) — \(path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))",
-                    detail: aliasStatus.isInstalled
-                        ? "Stop + Notification registered"
-                        : aliasStatus.registeredEvents.isEmpty
-                            ? "Not registered"
-                            : "Partial: \(aliasStatus.registeredEvents.joined(separator: ", "))",
-                    ok: aliasStatus.isInstalled
-                )
-            }
-
-            ForEach(HookInstaller.unsupportedAliases(in: aliasStore.aliases)) { alias in
-                statusBlock(
-                    label: "\(alias.command) — separate hook system",
-                    detail: "Notifications not yet supported for this CLI.",
-                    ok: false,
-                    iconOverride: "minus.circle.fill",
-                    iconColor: .secondary
-                )
-            }
+            hookStatusSection
 
             if let lastMessage {
                 Text(lastMessage)
                     .font(.caption)
                     .foregroundStyle(isError ? Color.red : Color.green)
-                    .padding(.top, 4)
+                    .padding(.top, Layout.topPadding)
             }
 
-            Text("VSVibe writes a small bash script to `~/.vsvibe/hooks/` and adds entries under `hooks.Stop` and `hooks.Notification` in each Claude-family alias's settings.json. Existing entries are preserved; a `.vsvibe.bak` backup is written next to each file before mutation.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.top, 4)
+            Text(
+                "VSVibe writes a small bash script to `~/.vsvibe/hooks/` and adds entries under "
+                    + "`hooks.Stop` and `hooks.Notification` in each Claude-family alias's settings.json. "
+                    + "Existing entries are preserved; a `.vsvibe.bak` backup is written next to each file "
+                    + "before mutation."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.top, Layout.topPadding)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 18)
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Layout.contentVerticalPadding)
+    }
+
+    @ViewBuilder private var aliasesSection: some View {
+        HStack {
+            Text("Custom aliases").font(.headline)
+            Spacer()
+            Button("Add Alias…", systemImage: "plus") {
+                editingAlias = nil
+                isAliasEditorPresented = true
+            }
+            .disabled(aliasStore.loadError != nil)
+        }
+        Text(
+            "Register a command or alias already available in your shell. "
+                + "Add its Claude config directory to enable hooks and usage tracking."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        if let error = aliasStore.loadError {
+            Text(error).font(.caption).foregroundStyle(.red)
+        } else if aliasStore.customAliases.isEmpty {
+            Text("No custom aliases yet.").font(.caption).foregroundStyle(.secondary)
+        }
+        ForEach(aliasStore.customAliases) { alias in
+            aliasRow(alias)
+        }
+    }
+
+    @ViewBuilder private var hookStatusSection: some View {
+        Text("Hook status").font(.headline)
+        statusBlock(
+            label: "Hook script",
+            detail: HookInstaller.hookScriptURL.path,
+            isOK: status.scriptInstalled
+        )
+
+        ForEach(status.aliases) { aliasStatus in
+            let path = aliasStatus.alias.settingsURL?.path ?? "(no config)"
+            let displayPath = path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+            statusBlock(
+                label: "\(aliasStatus.alias.command) — \(displayPath)",
+                detail: aliasStatus.isInstalled
+                    ? "Stop + Notification registered"
+                    : aliasStatus.registeredEvents.isEmpty
+                        ? "Not registered"
+                        : "Partial: \(aliasStatus.registeredEvents.joined(separator: ", "))",
+                isOK: aliasStatus.isInstalled
+            )
+        }
+
+        ForEach(HookInstaller.unsupportedAliases(in: aliasStore.aliases)) { alias in
+            statusBlock(
+                label: "\(alias.command) — separate hook system",
+                detail: "Notifications not yet supported for this CLI.",
+                isOK: false,
+                iconOverride: "minus.circle.fill",
+                iconColor: .secondary
+            )
+        }
     }
 
     private var footer: some View {
@@ -138,7 +155,9 @@ struct HookSetupView: View {
                 .keyboardShortcut(.cancelAction)
             if status.isFullyInstalled {
                 Button("Uninstall", role: .destructive) {
-                    runOperation("Removed hooks from all aliases.") { try HookInstaller.uninstall(aliases: aliasStore.aliases) }
+                    runOperation("Removed hooks from all aliases.") {
+                        try HookInstaller.uninstall(aliases: aliasStore.aliases)
+                    }
                 }
             } else {
                 Button(status.isPartiallyInstalled ? "Reinstall Hooks" : "Install Hooks") {
@@ -150,36 +169,62 @@ struct HookSetupView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Layout.footerVerticalPadding)
+    }
+
+    private func aliasRow(_ alias: LaunchAlias) -> some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(alias.command).font(.system(.body, design: .monospaced))
+                Text(alias.claudeConfigDir?.path ?? "No Claude config directory")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            Button("Edit") {
+                editingAlias = alias
+                isAliasEditorPresented = true
+            }
+            Button("Remove", role: .destructive) {
+                runOperation("Removed alias. Existing project commands are unchanged.") {
+                    try aliasStore.remove(command: alias.command)
+                }
+            }
+        }
     }
 
     @ViewBuilder
-    private func statusBlock(label: String,
-                             detail: String,
-                             ok: Bool,
-                             iconOverride: String? = nil,
-                             iconColor: Color? = nil) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: iconOverride ?? (ok ? "checkmark.circle.fill" : "xmark.circle.fill"))
-                .foregroundStyle(iconColor ?? (ok ? Color.green : Color.secondary))
-                .font(.system(size: 16))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label).font(.system(size: 12, weight: .semibold))
+    private func statusBlock(
+        label: String,
+        detail: String,
+        isOK: Bool,
+        iconOverride: String? = nil,
+        iconColor: Color? = nil
+    ) -> some View {
+        HStack(alignment: .top, spacing: Layout.headerSpacing) {
+            Image(systemName: iconOverride ?? (isOK ? "checkmark.circle.fill" : "xmark.circle.fill"))
+                .foregroundStyle(iconColor ?? (isOK ? Color.green : Color.secondary))
+                .font(.system(size: Layout.statusIconSize))
+                .accessibilityLabel(isOK ? "Installed" : "Not installed")
+            VStack(alignment: .leading, spacing: Layout.titleSpacing) {
+                Text(label).font(.system(size: Layout.statusLabelSize, weight: .semibold))
                 Text(detail)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(size: Layout.statusDetailSize, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
-                    .lineLimit(2)
+                    .lineLimit(Layout.statusDetailLineLimit)
                     .truncationMode(.middle)
             }
             Spacer()
         }
     }
 
-    private func runOperation(_ successMessage: String, _ op: () throws -> Void) {
+    private func runOperation(_ successMessage: String, _ operation: () throws -> Void) {
         do {
-            try op()
+            try operation()
             refreshStatus()
             lastMessage = successMessage
             isError = false

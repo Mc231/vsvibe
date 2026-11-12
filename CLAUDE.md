@@ -67,7 +67,8 @@ Persisted state lives in `~/Library/Application Support/VSVibe/`.
 - **SwiftLint: every rule is on** (`.swiftlint.yml`: `opt_in_rules: [all]` minus
   four mutually contradictory rules, each documented there). Warnings fail the
   build: `tools/lint.sh` runs `swiftlint lint --strict`. Never add
-  `swiftlint:disable` comments; fix the code. `swiftlint --fix` handles the
+  `swiftlint:disable` comments; fix the code (the single documented exception
+  is `VSVibeApp.appDelegate`, see `.swiftlint.yml`). `swiftlint --fix` handles the
   autocorrectable rules.
 - **Compiler warnings are errors** for the app and test targets
   (`SWIFT_TREAT_WARNINGS_AS_ERRORS` in `project.yml`).

@@ -1,20 +1,33 @@
-import Darwin
 import Foundation
 
 /// Synchronous worker-only runner. Files avoid stdout/stderr pipe deadlocks;
 /// a deadline bounds stalled Git commands, and reads have a memory limit.
-enum GitCommand {
-    struct Output {
-        let exitCode: Int32
-        let stdout: String
-        let stderr: String
-        let truncated: Bool
+internal enum GitCommand {
+    internal struct Output {
+        internal let exitCode: Int32
+        internal let stdout: String
+        internal let stderr: String
+        internal let truncated: Bool
     }
 
-    static func run(_ arguments: [String], in folder: URL,
-                    outputLimit: Int = 16 * 1_024 * 1_024,
-                    timeout: TimeInterval = 20,
-                    executable: URL = URL(fileURLWithPath: "/usr/bin/git")) throws -> Output {
+    private enum Constants {
+        /// stderr is only used for error messages, so 64 KiB is plenty.
+        static let stderrLimit = 65_536
+        static let terminateGracePeriod: TimeInterval = 0.5
+    }
+
+    /// Default cap on captured stdout (16 MiB).
+    internal static let defaultOutputLimit = 16_777_216
+    /// Default deadline for a single git invocation, in seconds.
+    internal static let defaultTimeout: TimeInterval = 20
+
+    internal static func run(
+        _ arguments: [String],
+        in folder: URL,
+        outputLimit: Int = defaultOutputLimit,
+        timeout: TimeInterval = defaultTimeout,
+        executable: URL = URL(fileURLWithPath: "/usr/bin/git")
+    ) throws -> Output {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("vsvibe-git-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -44,7 +57,7 @@ enum GitCommand {
         try process.run()
         if done.wait(timeout: .now() + timeout) == .timedOut {
             process.terminate()
-            if done.wait(timeout: .now() + 0.5) == .timedOut {
+            if done.wait(timeout: .now() + Constants.terminateGracePeriod) == .timedOut {
                 kill(process.processIdentifier, SIGKILL)
                 process.waitUntilExit()
             }
@@ -55,10 +68,12 @@ enum GitCommand {
         defer { try? reader.close(); try? errorReader.close() }
         let limit = max(0, outputLimit)
         let data = try reader.read(upToCount: limit + 1) ?? Data()
-        let errorData = try errorReader.read(upToCount: 64 * 1_024) ?? Data()
-        return Output(exitCode: process.terminationStatus,
-                      stdout: String(decoding: data.prefix(limit), as: UTF8.self),
-                      stderr: String(decoding: errorData, as: UTF8.self),
-                      truncated: data.count > limit)
+        let errorData = try errorReader.read(upToCount: Constants.stderrLimit) ?? Data()
+        return Output(
+            exitCode: process.terminationStatus,
+            stdout: String(decoding: data.prefix(limit), as: Unicode.UTF8.self),
+            stderr: String(decoding: errorData, as: Unicode.UTF8.self),
+            truncated: data.count > limit
+        )
     }
 }

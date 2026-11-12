@@ -1,9 +1,9 @@
 import Foundation
 
-enum EnvBuilder {
+internal enum EnvBuilder {
     /// PATH entries the spawned shell starts with: well-known tool dirs
     /// prepended to the inherited PATH, deduplicated in order.
-    static func searchPaths(extraPaths: [String] = []) -> [String] {
+    internal static func searchPaths(extraPaths: [String] = []) -> [String] {
         let env = ProcessInfo.processInfo.environment
         let home = env["HOME"] ?? NSHomeDirectory()
         let prepend = [
@@ -18,15 +18,15 @@ enum EnvBuilder {
         let existingParts = existing.split(separator: ":").map(String.init)
         var seen = Set<String>()
         var combined: [String] = []
-        for p in prepend + existingParts {
-            if !p.isEmpty && seen.insert(p).inserted {
-                combined.append(p)
+        for path in prepend + existingParts {
+            if !path.isEmpty && seen.insert(path).inserted {
+                combined.append(path)
             }
         }
         return combined
     }
 
-    static func build(extraPaths: [String] = []) -> [String] {
+    internal static func build(extraPaths: [String] = []) -> [String] {
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = searchPaths(extraPaths: extraPaths).joined(separator: ":")
 

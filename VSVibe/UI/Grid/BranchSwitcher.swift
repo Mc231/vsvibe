@@ -3,18 +3,35 @@ import SwiftUI
 /// Popover content that lists a folder's local git branches and switches to the
 /// one tapped. Loads the list on appear and reports a successful switch back via
 /// `onSwitched` so the pane chrome can update immediately.
-struct BranchSwitcher: View {
-    let folderURL: URL
-    let currentBranch: String
-    let onSwitched: (String) -> Void
+internal struct BranchSwitcher: View {
+    private enum Layout {
+        static let listPadding: CGFloat = 6
+        static let listMaxHeight: CGFloat = 300
+        static let errorFontSize: CGFloat = 11
+        static let errorPadding: CGFloat = 8
+        static let width: CGFloat = 260
+        static let rowSpacing: CGFloat = 6
+        static let iconSize: CGFloat = 10
+        static let iconWidth: CGFloat = 14
+        static let nameFontSize: CGFloat = 12
+        static let spacerMinLength: CGFloat = 4
+        static let rowVerticalPadding: CGFloat = 4
+        static let rowHorizontalPadding: CGFloat = 6
+        static let placeholderPadding: CGFloat = 12
+    }
 
-    @Environment(\.dismiss) private var dismiss
+    internal let folderURL: URL
+    internal let currentBranch: String
+    internal let onSwitched: (String) -> Void
+
+    @Environment(\.dismiss)
+    private var dismiss
     @State private var branches: [String] = []
     @State private var isLoading = true
     @State private var switching: String?
     @State private var errorMessage: String?
 
-    var body: some View {
+    internal var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if isLoading {
                 row { ProgressView().controlSize(.small) }
@@ -27,21 +44,21 @@ struct BranchSwitcher: View {
                             branchRow(name)
                         }
                     }
-                    .padding(6)
+                    .padding(Layout.listPadding)
                 }
-                .frame(maxHeight: 300)
+                .frame(maxHeight: Layout.listMaxHeight)
             }
 
             if let errorMessage {
                 Divider()
                 Text(errorMessage)
-                    .font(.system(size: 11))
+                    .font(.system(size: Layout.errorFontSize))
                     .foregroundStyle(.red)
                     .textSelection(.enabled)
-                    .padding(8)
+                    .padding(Layout.errorPadding)
             }
         }
-        .frame(width: 260)
+        .frame(width: Layout.width)
         .task { await load() }
     }
 
@@ -50,31 +67,35 @@ struct BranchSwitcher: View {
         return Button {
             Task { await switchTo(name) }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: Layout.rowSpacing) {
                 Image(systemName: isCurrent ? "checkmark" : "arrow.triangle.branch")
-                    .font(.system(size: 10, weight: .semibold))
-                    .frame(width: 14)
+                    .font(.system(size: Layout.iconSize, weight: .semibold))
+                    .frame(width: Layout.iconWidth)
                     .foregroundStyle(isCurrent ? Color.accentColor : .secondary)
+                    .accessibilityLabel(isCurrent ? "Current branch" : "Branch")
                 Text(name)
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.system(size: Layout.nameFontSize, design: .monospaced))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Spacer(minLength: 4)
+                Spacer(minLength: Layout.spacerMinLength)
                 if switching == name {
                     ProgressView().controlSize(.small)
                 }
             }
             .contentShape(Rectangle())
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
+            .padding(.vertical, Layout.rowVerticalPadding)
+            .padding(.horizontal, Layout.rowHorizontalPadding)
         }
         .buttonStyle(.plain)
         .disabled(isCurrent || switching != nil)
     }
 
     private func row<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        HStack { content(); Spacer(minLength: 0) }
-            .padding(12)
+        HStack {
+            content()
+            Spacer(minLength: 0)
+        }
+        .padding(Layout.placeholderPadding)
     }
 
     private func load() async {
@@ -85,7 +106,9 @@ struct BranchSwitcher: View {
     }
 
     private func switchTo(_ name: String) async {
-        guard switching == nil else { return }
+        guard switching == nil else {
+            return
+        }
         switching = name
         errorMessage = nil
         let url = folderURL

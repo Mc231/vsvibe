@@ -1,193 +1,194 @@
 import SwiftUI
 
-struct PaneChromeView: View {
-    @Environment(AppEnvironment.self) private var env
-    let session: TerminalSession
-    let onClose: () -> Void
-    let onRestart: () -> Void
-    let onOpenFreshPane: () -> Void
-    let onShowStats: () -> Void
+internal struct PaneChromeView: View {
+    private enum Layout {
+        static let spacing: CGFloat = 8
+        static let statusDotSize: CGFloat = 7
+        static let titleFontSize: CGFloat = 12
+        static let branchSpacing: CGFloat = 3
+        static let smallIconSize: CGFloat = 9
+        static let detailFontSize: CGFloat = 10
+        static let chevronSize: CGFloat = 6
+        static let branchOpacity: Double = 0.7
+        static let badgeHorizontalPadding: CGFloat = 5
+        static let badgeVerticalPadding: CGFloat = 1
+        static let badgeOpacity: Double = 0.85
+        static let spacerMinLength: CGFloat = 4
+        static let menuIconSize: CGFloat = 11
+        static let horizontalPadding: CGFloat = 8
+        static let verticalPadding: CGFloat = 4
+        static let gradientTop: Double = 0.16
+        static let gradientBottom: Double = 0.12
+    }
+
+    @Environment(AppEnvironment.self)
+    private var env
+    internal let session: TerminalSession
+    internal let onClose: () -> Void
+    internal let onRestart: () -> Void
+    internal let onOpenFreshPane: () -> Void
+    internal let onShowStats: () -> Void
 
     @State private var isBranchSwitcherPresented = false
 
-    private var statusColor: Color {
-        if !session.isAlive { return .secondary }
-        if session.awaitingInput { return .orange }
-        return .green
-    }
-
-    var body: some View {
-        HStack(spacing: 8) {
+    internal var body: some View {
+        HStack(spacing: Layout.spacing) {
             Image(systemName: session.isAlive ? "circle.fill" : "circle")
                 .foregroundStyle(statusColor)
-                .font(.system(size: 7))
+                .font(.system(size: Layout.statusDotSize))
+                .accessibilityLabel(session.isAlive ? "Running" : "Exited")
 
             Text(session.folder.displayName)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: Layout.titleFontSize, weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.middle)
 
-            if let branch = session.gitBranch {
-                Button {
-                    isBranchSwitcherPresented = true
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "arrow.triangle.branch")
-                            .font(.system(size: 9, weight: .semibold))
-                        Text(branch)
-                            .font(.system(size: 10, design: .monospaced))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 6, weight: .semibold))
-                    }
-                    .foregroundStyle(.white.opacity(0.7))
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("Switch git branch (current: \(branch))")
-                .popover(isPresented: $isBranchSwitcherPresented, arrowEdge: .bottom) {
-                    BranchSwitcher(folderURL: session.folder.url, currentBranch: branch) { newBranch in
-                        session.gitBranch = newBranch
-                    }
-                }
-            }
-
-            if session.awaitingInput {
-                Image(systemName: "bell.fill")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.orange)
-            } else if session.unreadEventCount > 0 {
-                Text("\(session.unreadEventCount)")
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(Color.accentColor.opacity(0.85)))
-                    .foregroundStyle(.white)
-            }
-
-            if let label = session.lastEventLabel, session.awaitingInput || session.unreadEventCount > 0 {
-                Text(label)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            } else if !session.isAlive {
-                Text("exited")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
+            branchButton
+            eventIndicator
+            statusLabel
 
             if let usage = session.usage, usage.messageCount > 0 {
                 UsageBadge(usage: usage)
             }
 
-            Spacer(minLength: 4)
+            Spacer(minLength: Layout.spacerMinLength)
 
-            OpenInMenu(folder: session.folder.url)
-                .foregroundStyle(.white)
-                .tint(.white)
-
-            Button(action: onRestart) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 10, weight: .semibold))
-            }
-            .buttonStyle(.plain)
-            .help("Restart Pane")
-
-            Menu {
-                Button {
-                    env.pendingGitReview = session.folder
-                } label: {
-                    Label("Review Git Changes…", systemImage: "doc.text.magnifyingglass")
-                }
-                Button {
-                    onOpenFreshPane()
-                } label: {
-                    Label("Open Fresh Pane", systemImage: "square.on.square")
-                }
-                .help("Open a second pane for the same folder with a fresh session.")
-                Button {
-                    onShowStats()
-                } label: {
-                    Label("Project Stats…", systemImage: "chart.bar")
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .tint(.white)
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Pane Options")
-
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
-            }
-            .buttonStyle(.plain)
-            .help("Close Pane")
+            trailingControls
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Layout.verticalPadding)
         .background(
             LinearGradient(
-                colors: [Color(white: 0.16), Color(white: 0.12)],
+                colors: [Color(white: Layout.gradientTop), Color(white: Layout.gradientBottom)],
                 startPoint: .top,
                 endPoint: .bottom
             )
         )
         .foregroundStyle(.white)
     }
-}
 
-private struct UsageBadge: View {
-    let usage: SessionUsage
+    private var statusColor: Color {
+        if !session.isAlive {
+            return .secondary
+        }
+        if session.awaitingInput {
+            return .orange
+        }
+        return .green
+    }
 
-    private var pctColor: Color {
-        switch usage.contextPercent {
-        case 0..<60: return .green
-        case 60..<85: return .yellow
-        default: return .red
+    @ViewBuilder private var branchButton: some View {
+        if let branch = session.gitBranch {
+            Button {
+                isBranchSwitcherPresented = true
+            } label: {
+                HStack(spacing: Layout.branchSpacing) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: Layout.smallIconSize, weight: .semibold))
+                        .accessibilityHidden(true)
+                    Text(branch)
+                        .font(.system(size: Layout.detailFontSize, design: .monospaced))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: Layout.chevronSize, weight: .semibold))
+                        .accessibilityHidden(true)
+                }
+                .foregroundStyle(.white.opacity(Layout.branchOpacity))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Switch git branch (current: \(branch))")
+            .popover(isPresented: $isBranchSwitcherPresented, arrowEdge: .bottom) {
+                BranchSwitcher(folderURL: session.folder.url, currentBranch: branch) { newBranch in
+                    session.gitBranch = newBranch
+                }
+            }
         }
     }
 
-    private var totalTokensLabel: String {
-        let n = usage.totalInput + usage.totalOutput + usage.totalCacheCreation + usage.totalCacheRead
-        if n >= 1_000_000 {
-            return String(format: "%.1fM", Double(n) / 1_000_000)
+    @ViewBuilder private var eventIndicator: some View {
+        if session.awaitingInput {
+            Image(systemName: "bell.fill")
+                .font(.system(size: Layout.smallIconSize, weight: .semibold))
+                .foregroundStyle(.orange)
+                .accessibilityLabel("Awaiting input")
+        } else if session.unreadEventCount > 0 {
+            Text("\(session.unreadEventCount)")
+                .font(.system(size: Layout.smallIconSize, weight: .semibold, design: .monospaced))
+                .padding(.horizontal, Layout.badgeHorizontalPadding)
+                .padding(.vertical, Layout.badgeVerticalPadding)
+                .background(Capsule().fill(Color.accentColor.opacity(Layout.badgeOpacity)))
+                .foregroundStyle(.white)
         }
-        if n >= 1_000 {
-            return String(format: "%.0fk", Double(n) / 1_000)
-        }
-        return "\(n)"
     }
 
-    var body: some View {
-        HStack(spacing: 6) {
-            HStack(spacing: 2) {
-                Image(systemName: "circle.dashed")
-                    .font(.system(size: 9, weight: .semibold))
-                Text(String(format: "%.0f%%", usage.contextPercent))
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-            }
-            .foregroundStyle(pctColor)
-
-            Text(totalTokensLabel)
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.8))
-
-            if usage.estimatedCostUSD >= 0.01 {
-                Text(String(format: "$%.2f", usage.estimatedCostUSD))
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.6))
-            }
+    @ViewBuilder private var statusLabel: some View {
+        if let label = session.lastEventLabel, session.awaitingInput || session.unreadEventCount > 0 {
+            Text(label)
+                .font(.system(size: Layout.detailFontSize))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        } else if !session.isAlive {
+            Text("exited")
+                .font(.system(size: Layout.detailFontSize))
+                .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(Capsule().fill(Color.white.opacity(0.08)))
-        .help("Context \(Int(usage.contextPercent))% of \(usage.contextWindow.formatted()) · \(usage.messageCount) msgs")
+    }
+
+    @ViewBuilder private var trailingControls: some View {
+        OpenInMenu(folder: session.folder.url)
+            .foregroundStyle(.white)
+            .tint(.white)
+
+        Button(action: onRestart) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: Layout.detailFontSize, weight: .semibold))
+                .accessibilityLabel("Restart Pane")
+        }
+        .buttonStyle(.plain)
+        .help("Restart Pane")
+
+        optionsMenu
+
+        Button(action: onClose) {
+            Image(systemName: "xmark")
+                .font(.system(size: Layout.detailFontSize, weight: .semibold))
+                .accessibilityLabel("Close Pane")
+        }
+        .buttonStyle(.plain)
+        .help("Close Pane")
+    }
+
+    private var optionsMenu: some View {
+        Menu {
+            Button {
+                env.pendingGitReview = session.folder
+            } label: {
+                Label("Review Git Changes…", systemImage: "doc.text.magnifyingglass")
+            }
+            Button {
+                onOpenFreshPane()
+            } label: {
+                Label("Open Fresh Pane", systemImage: "square.on.square")
+            }
+            .help("Open a second pane for the same folder with a fresh session.")
+            Button {
+                onShowStats()
+            } label: {
+                Label("Project Stats…", systemImage: "chart.bar")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: Layout.menuIconSize, weight: .semibold))
+                .foregroundStyle(.white)
+                .accessibilityLabel("Pane Options")
+        }
+        .tint(.white)
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Pane Options")
     }
 }

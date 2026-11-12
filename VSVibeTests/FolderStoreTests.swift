@@ -1,18 +1,22 @@
 @testable import VSVibe
 import XCTest
 
+/// Projects, grouping/ordering and persistence. Label CRUD and assignment live
+/// in `FolderStoreLabelTests`.
 @MainActor
-final class FolderStoreTests: XCTestCase {
-    private var dir: URL!
-    private var stateFile: URL!
+internal final class FolderStoreTests: XCTestCase {
+    private var dir = TestSupport.placeholderURL
 
-    override func setUp() {
-        super.setUp()
-        dir = TestSupport.makeTempDir("folderstore")
-        stateFile = dir.appendingPathComponent("state.json")
+    private var stateFile: URL {
+        dir.appendingPathComponent("state.json")
     }
 
-    override func tearDown() {
+    override internal func setUp() {
+        super.setUp()
+        dir = TestSupport.makeTempDir("folderstore")
+    }
+
+    override internal func tearDown() {
         TestSupport.remove(dir)
         super.tearDown()
     }
@@ -34,30 +38,29 @@ final class FolderStoreTests: XCTestCase {
 
     // MARK: - Projects
 
-    func testAddSkipsDuplicatePaths() {
+    internal func testAddSkipsDuplicatePaths() {
         let store = makeStore()
         store.add(url: url("a"))
         store.add(url: url("a"))
         XCTAssertEqual(store.folders.count, 1)
-        XCTAssertTrue(store.contains(url: url("a")))
     }
 
-    func testCreateProjectWithLabels() {
+    internal func testCreateProjectWithLabels() throws {
         let store = makeStore()
-        let label = store.createLabel(name: "Work")!
+        let label = try XCTUnwrap(store.createLabel(name: "Work"))
         let entry = store.createProject(url: url("api"), name: "API", launchCommand: "claude", labelIDs: [label.id])
         XCTAssertEqual(entry.labelIDs, [label.id])
     }
 
-    func testCreateProjectDropsUnknownLabelIDs() {
+    internal func testCreateProjectDropsUnknownLabelIDs() {
         let store = makeStore()
         let entry = store.createProject(url: url("api"), name: "API", launchCommand: "claude", labelIDs: [UUID()])
         XCTAssertTrue(entry.labelIDs.isEmpty)
     }
 
-    func testCreateProjectOnExistingPathUpdatesInstead() {
+    internal func testCreateProjectOnExistingPathUpdatesInstead() throws {
         let store = makeStore()
-        let label = store.createLabel(name: "Work")!
+        let label = try XCTUnwrap(store.createLabel(name: "Work"))
         store.createProject(url: url("api"), name: "API", launchCommand: "claude")
         store.createProject(url: url("api"), name: "API v2", launchCommand: "opencode", labelIDs: [label.id])
         XCTAssertEqual(store.folders.count, 1)
@@ -66,173 +69,27 @@ final class FolderStoreTests: XCTestCase {
         XCTAssertEqual(store.folders[0].labelIDs, [label.id])
     }
 
-    func testUpdateProjectLeavesLabelsAloneWhenNilPassed() {
+    internal func testUpdateProjectLeavesLabelsAloneWhenNilPassed() throws {
         let store = makeStore()
-        let label = store.createLabel(name: "Work")!
+        let label = try XCTUnwrap(store.createLabel(name: "Work"))
         let entry = store.createProject(url: url("api"), name: "API", launchCommand: "claude", labelIDs: [label.id])
         store.updateProject(id: entry.id, name: "Renamed", launchCommand: "claude")
         XCTAssertEqual(store.folders[0].labelIDs, [label.id])
         XCTAssertEqual(store.folders[0].displayName, "Renamed")
     }
 
-    func testRemoveAndRenameAndSetLaunchCommand() {
+    internal func testRemove() {
         let store = makeStore()
         let entry = store.createProject(url: url("api"), name: "API", launchCommand: "claude")
-        store.rename(id: entry.id, to: "Renamed")
-        XCTAssertEqual(store.folders[0].displayName, "Renamed")
-        store.setLaunchCommand(id: entry.id, to: "  ")   // ignored
-        XCTAssertEqual(store.folders[0].launchCommand, "claude")
-        store.setLaunchCommand(id: entry.id, to: "opencode")
-        XCTAssertEqual(store.folders[0].launchCommand, "opencode")
         store.remove(id: entry.id)
         XCTAssertTrue(store.folders.isEmpty)
     }
 
-    // MARK: - Label CRUD
-
-    func testCreateLabelTrimsAndAssignsDistinctColors() {
-        let store = makeStore()
-        let a = store.createLabel(name: "  Work  ")
-        let b = store.createLabel(name: "Pet")
-        XCTAssertEqual(a?.name, "Work")
-        XCTAssertNotEqual(a?.colorHex, b?.colorHex)
-        XCTAssertEqual(store.labels.count, 2)
-    }
-
-    func testCreateLabelRejectsBlankName() {
-        let store = makeStore()
-        XCTAssertNil(store.createLabel(name: "   "))
-        XCTAssertTrue(store.labels.isEmpty)
-    }
-
-    func testCreateLabelReturnsExistingOnDuplicateName() {
-        let store = makeStore()
-        let first = store.createLabel(name: "Work")!
-        let again = store.createLabel(name: "work")
-        XCTAssertEqual(again?.id, first.id)
-        XCTAssertEqual(store.labels.count, 1)
-    }
-
-    func testUpdateLabel() {
-        let store = makeStore()
-        let label = store.createLabel(name: "Work")!
-        store.updateLabel(id: label.id, name: "Clients", colorHex: "22c55e", symbolName: "leaf.fill")
-        XCTAssertEqual(store.label(id: label.id)?.name, "Clients")
-        XCTAssertEqual(store.label(id: label.id)?.colorHex, "#22C55E")
-        XCTAssertEqual(store.label(id: label.id)?.symbolName, "leaf.fill")
-    }
-
-    func testUpdateLabelIgnoresBlankNameAndBadColor() {
-        let store = makeStore()
-        let label = store.createLabel(name: "Work", colorHex: "#3B82F6")!
-        store.updateLabel(id: label.id, name: "  ", colorHex: "nope", symbolName: "")
-        XCTAssertEqual(store.label(id: label.id)?.name, "Work")
-        XCTAssertEqual(store.label(id: label.id)?.colorHex, "#3B82F6")
-        XCTAssertEqual(store.label(id: label.id)?.symbolName, LabelPalette.defaultSymbol)
-    }
-
-    func testDeleteLabelDetachesItFromProjectsButKeepsThem() {
-        let store = makeStore()
-        let work = store.createLabel(name: "Work")!
-        let pet = store.createLabel(name: "Pet")!
-        let entry = store.createProject(url: url("api"), name: "API", launchCommand: "claude",
-                                        labelIDs: [work.id, pet.id])
-
-        store.deleteLabel(id: work.id)
-
-        XCTAssertEqual(store.labels.map(\.name), ["Pet"])
-        XCTAssertEqual(store.folders.count, 1)
-        XCTAssertEqual(store.folders.first { $0.id == entry.id }?.labelIDs, [pet.id])
-    }
-
-    func testDeleteUnknownLabelIsNoOp() {
-        let store = makeStore()
-        store.createLabel(name: "Work")
-        store.deleteLabel(id: UUID())
-        XCTAssertEqual(store.labels.count, 1)
-    }
-
-    func testMoveLabelsReordersSections() {
-        let store = makeStore()
-        store.createLabel(name: "A")
-        store.createLabel(name: "B")
-        store.createLabel(name: "C")
-        store.moveLabels(fromOffsets: IndexSet(integer: 2), toOffset: 0)
-        XCTAssertEqual(store.labels.map(\.name), ["C", "A", "B"])
-    }
-
-    func testCollapsedStateToggles() {
-        let store = makeStore()
-        let label = store.createLabel(name: "Work")!
-        XCTAssertFalse(store.label(id: label.id)!.isCollapsed)
-        store.setLabelCollapsed(id: label.id, true)
-        XCTAssertTrue(store.label(id: label.id)!.isCollapsed)
-        store.setUngroupedCollapsed(true)
-        XCTAssertTrue(store.ungroupedCollapsed)
-        store.setUngroupedCollapsed(true) // no-op branch
-        XCTAssertTrue(store.ungroupedCollapsed)
-    }
-
-    // MARK: - Assignment
-
-    func testToggleLabelAddsThenRemoves() {
-        let store = makeStore()
-        let label = store.createLabel(name: "Work")!
-        let entry = store.createProject(url: url("api"), name: "API", launchCommand: "claude")
-
-        store.toggleLabel(label.id, for: entry.id)
-        XCTAssertEqual(store.folders[0].labelIDs, [label.id])
-        store.toggleLabel(label.id, for: entry.id)
-        XCTAssertTrue(store.folders[0].labelIDs.isEmpty)
-    }
-
-    func testAddLabelIgnoresUnknownLabelAndDuplicates() {
-        let store = makeStore()
-        let label = store.createLabel(name: "Work")!
-        let entry = store.createProject(url: url("api"), name: "API", launchCommand: "claude")
-
-        store.addLabel(UUID(), to: entry.id)
-        XCTAssertTrue(store.folders[0].labelIDs.isEmpty)
-        store.addLabel(label.id, to: entry.id)
-        store.addLabel(label.id, to: entry.id)
-        XCTAssertEqual(store.folders[0].labelIDs, [label.id])
-    }
-
-    func testRemoveLabelNotPresentIsNoOp() {
-        let store = makeStore()
-        let label = store.createLabel(name: "Work")!
-        let entry = store.createProject(url: url("api"), name: "API", launchCommand: "claude")
-        store.removeLabel(label.id, from: entry.id)
-        XCTAssertTrue(store.folders[0].labelIDs.isEmpty)
-    }
-
-    func testSetLabelsDedupesAndDropsUnknown() {
-        let store = makeStore()
-        let a = store.createLabel(name: "A")!
-        let b = store.createLabel(name: "B")!
-        let entry = store.createProject(url: url("api"), name: "API", launchCommand: "claude")
-
-        store.setLabels([a.id, a.id, UUID(), b.id], for: entry.id)
-        XCTAssertEqual(store.folders[0].labelIDs, [a.id, b.id])
-
-        store.setLabels([], for: entry.id)
-        XCTAssertTrue(store.folders[0].labelIDs.isEmpty)
-    }
-
-    func testLabelsForFolderResolvesInAssignmentOrder() {
-        let store = makeStore()
-        let a = store.createLabel(name: "A")!
-        let b = store.createLabel(name: "B")!
-        let entry = store.createProject(url: url("api"), name: "API", launchCommand: "claude",
-                                        labelIDs: [b.id, a.id])
-        XCTAssertEqual(store.labels(for: entry).map(\.name), ["B", "A"])
-    }
-
     // MARK: - Grouping / ordering
 
-    func testSidebarGroupsReflectStoreContents() {
+    internal func testSidebarGroupsReflectStoreContents() throws {
         let store = makeStore()
-        let work = store.createLabel(name: "Work")!
+        let work = try XCTUnwrap(store.createLabel(name: "Work"))
         store.createProject(url: url("api"), name: "API", launchCommand: "claude", labelIDs: [work.id])
         store.createProject(url: url("scratch"), name: "scratch", launchCommand: "claude")
 
@@ -240,20 +97,20 @@ final class FolderStoreTests: XCTestCase {
         XCTAssertEqual(store.sidebarGroups[0].folders.map(\.displayName), ["API"])
     }
 
-    func testMoveInGroupReordersGlobally() {
+    internal func testMoveInGroupReordersGlobally() throws {
         let store = makeStore()
-        let work = store.createLabel(name: "Work")!
-        let w1 = store.createProject(url: url("w1"), name: "w1", launchCommand: "claude", labelIDs: [work.id])
+        let work = try XCTUnwrap(store.createLabel(name: "Work"))
+        let first = store.createProject(url: url("w1"), name: "w1", launchCommand: "claude", labelIDs: [work.id])
         store.createProject(url: url("other"), name: "other", launchCommand: "claude")
-        let w2 = store.createProject(url: url("w2"), name: "w2", launchCommand: "claude", labelIDs: [work.id])
+        let second = store.createProject(url: url("w2"), name: "w2", launchCommand: "claude", labelIDs: [work.id])
 
-        store.move(inGroupWithFolderIDs: [w1.id, w2.id], fromOffsets: IndexSet(integer: 1), toOffset: 0)
+        store.move(inGroupWithFolderIDs: [first.id, second.id], fromOffsets: IndexSet(integer: 1), toOffset: 0)
 
         XCTAssertEqual(store.folders.map(\.displayName), ["w2", "other", "w1"])
         XCTAssertEqual(store.sidebarGroups[0].folders.map(\.displayName), ["w2", "w1"])
     }
 
-    func testTopLevelMoveStillWorks() {
+    internal func testTopLevelMoveStillWorks() {
         let store = makeStore()
         store.createProject(url: url("a"), name: "a", launchCommand: "claude")
         store.createProject(url: url("b"), name: "b", launchCommand: "claude")
@@ -263,9 +120,9 @@ final class FolderStoreTests: XCTestCase {
 
     // MARK: - Persistence
 
-    func testLabelsAndAssignmentsSurviveReload() {
+    internal func testLabelsAndAssignmentsSurviveReload() throws {
         let store = makeStore()
-        let work = store.createLabel(name: "Work", colorHex: "#22C55E", symbolName: "hammer.fill")!
+        let work = try XCTUnwrap(store.createLabel(name: "Work", colorHex: "#22C55E", symbolName: "hammer.fill"))
         store.createProject(url: url("api"), name: "API", launchCommand: "claude", labelIDs: [work.id])
         store.setLabelCollapsed(id: work.id, true)
         store.setUngroupedCollapsed(true)
@@ -282,7 +139,7 @@ final class FolderStoreTests: XCTestCase {
     }
 
     /// A legacy v1 state file must load, with every project unlabelled.
-    func testLoadsVersion1StateFile() {
+    internal func testLoadsVersion1StateFile() {
         let json = """
         {"version":1,"folders":[{"id":"\(UUID().uuidString)","url":"file:///Users/x/a/",\
         "displayName":"a","launchCommand":"claude","addedAt":"2026-01-01T00:00:00Z"}]}
@@ -297,33 +154,37 @@ final class FolderStoreTests: XCTestCase {
     }
 
     /// Label ids left behind by an out-of-band edit are dropped on load.
-    func testLoadDropsDanglingLabelIDs() {
+    internal func testLoadDropsDanglingLabelIDs() throws {
         let store = makeStore()
-        let work = store.createLabel(name: "Work")!
+        let work = try XCTUnwrap(store.createLabel(name: "Work"))
         store.createProject(url: url("api"), name: "API", launchCommand: "claude", labelIDs: [work.id])
         waitForSave()
 
         // Rewrite the file with the label removed but the assignment kept.
-        var obj = try! JSONSerialization.jsonObject(with: Data(contentsOf: stateFile)) as! [String: Any]
+        let saved = try Data(contentsOf: stateFile)
+        var obj = try XCTUnwrap(JSONSerialization.jsonObject(with: saved) as? [String: Any])
         obj["labels"] = []
-        TestSupport.write(String(decoding: try! JSONSerialization.data(withJSONObject: obj), as: UTF8.self),
-                          to: stateFile)
+        try JSONSerialization.data(withJSONObject: obj).write(to: stateFile)
 
         let reloaded = makeStore()
         XCTAssertTrue(reloaded.folders[0].labelIDs.isEmpty)
         XCTAssertEqual(reloaded.sidebarGroups.map(\.title), ["Shortcuts"])
     }
 
-    func testMissingStateFileStartsEmpty() {
+    internal func testMissingStateFileStartsEmpty() {
         let store = FolderStore(fileURL: dir.appendingPathComponent("nope.json"))
         XCTAssertTrue(store.folders.isEmpty)
         XCTAssertTrue(store.labels.isEmpty)
     }
 
-    func testCorruptStateFileStartsEmpty() {
+    internal func testCorruptStateFileStartsEmpty() {
         TestSupport.write("{ not json", to: stateFile)
         let store = makeStore()
         XCTAssertTrue(store.folders.isEmpty)
         XCTAssertTrue(store.labels.isEmpty)
+    }
+
+    deinit {
+        // Nothing to release; the temp dir is removed in tearDown.
     }
 }

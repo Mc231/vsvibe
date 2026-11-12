@@ -1,45 +1,33 @@
 import SwiftUI
 
-enum LabelEditorMode: Identifiable, Equatable {
-    /// Create a label; when `assignTo` is set the new label is applied to that
-    /// project right away (used by the row context menu).
-    case create(assignTo: FolderEntry.ID?)
-    case edit(label: ProjectLabel)
-
-    var id: String {
-        switch self {
-        case .create(let assignTo): "create:\(assignTo?.uuidString ?? "-")"
-        case .edit(let label): "edit:\(label.id.uuidString)"
-        }
+internal struct LabelEditorView: View {
+    private enum Layout {
+        static let width: CGFloat = 420
+        static let headerSpacing: CGFloat = 10
+        static let headerIconWidth: CGFloat = 26
+        static let titleSpacing: CGFloat = 2
+        static let horizontalPadding: CGFloat = 20
+        static let headerVerticalPadding: CGFloat = 14
+        static let formSpacing: CGFloat = 16
+        static let colorSpacing: CGFloat = 2
+        static let colorVerticalPadding: CGFloat = 3
+        static let symbolSpacing: CGFloat = 4
+        static let formVerticalPadding: CGFloat = 18
+        static let footerVerticalPadding: CGFloat = 12
+        static let fieldSpacing: CGFloat = 6
     }
 
-    var isCreate: Bool {
-        if case .create = self { return true }
-        return false
-    }
-}
-
-struct LabelEditorResult {
-    let name: String
-    let colorHex: String
-    let symbolName: String
-}
-
-struct LabelEditorView: View {
-    let mode: LabelEditorMode
+    internal let mode: LabelEditorMode
     /// Colors already taken, used to pre-select an unused one when creating.
-    let usedColors: [String]
-    let onSave: (LabelEditorResult) -> Void
-    let onCancel: () -> Void
+    internal let usedColors: [String]
+    internal let onSave: (LabelEditorResult) -> Void
+    internal let onCancel: () -> Void
 
     @State private var name: String = ""
     @State private var colorHex: String = LabelPalette.defaultColor
     @State private var symbolName: String = LabelPalette.defaultSymbol
 
-    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var canSave: Bool { !trimmedName.isEmpty }
-
-    var body: some View {
+    internal var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
@@ -47,17 +35,21 @@ struct LabelEditorView: View {
             Divider()
             footer
         }
-        .frame(width: 420)
+        .frame(width: Layout.width)
         .onAppear { populate() }
     }
 
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canSave: Bool { !trimmedName.isEmpty }
+
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Layout.headerSpacing) {
             Image(systemName: symbolName)
                 .font(.title2)
                 .foregroundStyle(Color(labelHex: colorHex))
-                .frame(width: 26)
-            VStack(alignment: .leading, spacing: 2) {
+                .frame(width: Layout.headerIconWidth)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Layout.titleSpacing) {
                 Text(mode.isCreate ? "New Label" : "Edit Label")
                     .font(.headline)
                 Text(trimmedName.isEmpty ? "Group projects in the sidebar" : trimmedName)
@@ -67,19 +59,19 @@ struct LabelEditorView: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Layout.headerVerticalPadding)
     }
 
     private var form: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Layout.formSpacing) {
             field("Name") {
                 TextField("Work, Pet projects, Clients…", text: $name)
                     .textFieldStyle(.roundedBorder)
             }
 
             field("Color") {
-                FlowLayout(spacing: 2, lineSpacing: 2) {
+                FlowLayout(spacing: Layout.colorSpacing, lineSpacing: Layout.colorSpacing) {
                     ForEach(LabelPalette.colors, id: \.self) { hex in
                         ColorSwatch(hex: hex, isSelected: hex == colorHex) {
                             colorHex = hex
@@ -87,15 +79,17 @@ struct LabelEditorView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 3)
+                .padding(.vertical, Layout.colorVerticalPadding)
             }
 
             field("Icon") {
-                FlowLayout(spacing: 4, lineSpacing: 4) {
+                FlowLayout(spacing: Layout.symbolSpacing, lineSpacing: Layout.symbolSpacing) {
                     ForEach(LabelPalette.symbols, id: \.self) { symbol in
-                        SymbolSwatch(symbol: symbol,
-                                     tint: Color(labelHex: colorHex),
-                                     isSelected: symbol == symbolName) {
+                        SymbolSwatch(
+                            symbol: symbol,
+                            tint: Color(labelHex: colorHex),
+                            isSelected: symbol == symbolName
+                        ) {
                             symbolName = symbol
                         }
                     }
@@ -103,8 +97,8 @@ struct LabelEditorView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 18)
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Layout.formVerticalPadding)
     }
 
     private var footer: some View {
@@ -113,20 +107,22 @@ struct LabelEditorView: View {
             Button("Cancel", role: .cancel) { onCancel() }
                 .keyboardShortcut(.cancelAction)
             Button(mode.isCreate ? "Create" : "Save") {
-                guard canSave else { return }
+                guard canSave else {
+                    return
+                }
                 onSave(LabelEditorResult(name: trimmedName, colorHex: colorHex, symbolName: symbolName))
             }
             .keyboardShortcut(.defaultAction)
             .buttonStyle(.borderedProminent)
             .disabled(!canSave)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Layout.footerVerticalPadding)
     }
 
     @ViewBuilder
     private func field<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Layout.fieldSpacing) {
             Text(label)
                 .font(.caption)
                 .fontWeight(.semibold)
@@ -149,50 +145,5 @@ struct LabelEditorView: View {
             colorHex = label.colorHex
             symbolName = label.symbolName
         }
-    }
-}
-
-private struct ColorSwatch: View {
-    let hex: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Circle()
-                .fill(Color(labelHex: hex))
-                .frame(width: 20, height: 20)
-                .overlay(
-                    Circle()
-                        .strokeBorder(Color.primary.opacity(isSelected ? 0.8 : 0.0), lineWidth: 2)
-                        .padding(-3)
-                )
-                // Keep the selection ring inside the swatch's own bounds so it
-                // never clips against the sheet edge.
-                .padding(4)
-        }
-        .buttonStyle(.plain)
-        .help(hex)
-    }
-}
-
-private struct SymbolSwatch: View {
-    let symbol: String
-    let tint: Color
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 13))
-                .foregroundStyle(isSelected ? tint : Color.secondary)
-                .frame(width: 30, height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(isSelected ? tint.opacity(0.18) : Color.secondary.opacity(0.10))
-                )
-        }
-        .buttonStyle(.plain)
     }
 }

@@ -1,19 +1,26 @@
 @testable import VSVibe
 import XCTest
 
-final class GitReviewTests: XCTestCase {
+internal final class GitReviewTests: XCTestCase {
     private var directories: [URL] = []
-    override func tearDown() {
+
+    override internal func setUp() {
+        super.setUp()
+        directories = []
+    }
+
+    override internal func tearDown() {
         directories.forEach(TestSupport.remove)
         super.tearDown()
     }
+
     private func repo() -> URL {
         let url = TestSupport.makeRepo()
         directories.append(url)
         return url
     }
 
-    func testBranchesIncludesRemoteButNotSymbolicRemoteHead() throws {
+    internal func testBranchesIncludesRemoteButNotSymbolicRemoteHead() throws {
         let url = repo()
         TestSupport.git(["branch", "feature/test"], in: url)
         TestSupport.git(["update-ref", "refs/remotes/origin/main", "HEAD"], in: url)
@@ -25,7 +32,7 @@ final class GitReviewTests: XCTestCase {
         XCTAssertEqual(branches.last?.id, "HEAD")
     }
 
-    func testComparisonModesAndReadOnlySnapshot() throws {
+    internal func testComparisonModesAndReadOnlySnapshot() throws {
         let url = repo()
         TestSupport.git(["switch", "-c", "feature"], in: url)
         TestSupport.write("feature\n", to: url.appendingPathComponent("feature.txt"))
@@ -46,15 +53,20 @@ final class GitReviewTests: XCTestCase {
         let patch = try GitReview.patch(in: url, comparison: review, file: XCTUnwrap(review.files.first))
         XCTAssertTrue(patch.contains("+feature"))
         XCTAssertEqual(GitInfo.currentBranch(forFolder: url), "main")
-        XCTAssertEqual(try String(contentsOf: url.appendingPathComponent("README.md")), "uncommitted\n")
+        XCTAssertEqual(
+            try String(contentsOf: url.appendingPathComponent("README.md"), encoding: .utf8),
+            "uncommitted\n"
+        )
         XCTAssertTrue(try GitReview.compare(in: url, base: "main", target: "main", mode: .tips).files.isEmpty)
     }
 
-    func testUnusualPathsBinaryDeletionAndLiteralPathspec() throws {
+    internal func testUnusualPathsBinaryDeletionAndLiteralPathspec() throws {
         let url = repo()
         TestSupport.git(["branch", "base"], in: url)
         let paths = ["space name.txt", "tab\tname.txt", "line\nbreak.txt", ":(glob)*", "unicode-ї.txt"]
-        for path in paths { TestSupport.write("new\n", to: url.appendingPathComponent(path)) }
+        for path in paths {
+            TestSupport.write("new\n", to: url.appendingPathComponent(path))
+        }
         try Data([0, 1, 2, 0, 4]).write(to: url.appendingPathComponent("binary.dat"))
         TestSupport.git(["rm", "README.md"], in: url)
         TestSupport.git(["add", "."], in: url)
@@ -69,7 +81,7 @@ final class GitReviewTests: XCTestCase {
         XCTAssertFalse(patch.contains("space name.txt"))
     }
 
-    func testInvalidRepositoryEmptyRepositoryAndInvalidRef() throws {
+    internal func testInvalidRepositoryEmptyRepositoryAndInvalidRef() throws {
         let url = TestSupport.makeTempDir()
         directories.append(url)
         XCTAssertThrowsError(try GitReview.branches(in: url))
@@ -77,12 +89,16 @@ final class GitReviewTests: XCTestCase {
         XCTAssertThrowsError(try GitReview.branches(in: url))
         let valid = repo()
         XCTAssertThrowsError(try GitReview.compare(in: valid, base: "--help", target: "main", mode: .tips))
-        XCTAssertThrowsError(try GitReview.patch(in: valid,
-                                               comparison: GitComparison(baseCommit: "missing", targetCommit: "HEAD", files: []),
-                                               file: GitChangedFile(path: "README.md", status: "M", added: 0, removed: 0)))
+        XCTAssertThrowsError(
+            try GitReview.patch(
+                in: valid,
+                comparison: GitComparison(baseCommit: "missing", targetCommit: "HEAD", files: []),
+                file: GitChangedFile(path: "README.md", status: "M", added: 0, removed: 0)
+            )
+        )
     }
 
-    func testReviewFromSubdirectoryAndWorktree() throws {
+    internal func testReviewFromSubdirectoryAndWorktree() throws {
         let url = repo()
         TestSupport.git(["branch", "base"], in: url)
         let subdirectory = url.appendingPathComponent("nested")
@@ -97,39 +113,59 @@ final class GitReviewTests: XCTestCase {
         let worktree = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)
         directories.append(worktree)
         TestSupport.git(["worktree", "add", "--detach", worktree.path, "HEAD"], in: url)
-        XCTAssertEqual(try GitReview.compare(in: worktree, base: "base", target: "HEAD", mode: .tips).files, result.files)
+        XCTAssertEqual(
+            try GitReview.compare(in: worktree, base: "base", target: "HEAD", mode: .tips).files,
+            result.files
+        )
     }
 
-    func testParserHandlesMalformedRecordsAndMissingCounts() {
+    internal func testParserHandlesMalformedRecordsAndMissingCounts() {
         XCTAssertTrue(GitReview.parseFiles(names: "", counts: "invalid").isEmpty)
         let files = GitReview.parseFiles(names: "M\0file\0incomplete", counts: "bad\0")
         XCTAssertEqual(files.count, 1)
         XCTAssertTrue(files[0].isBinary)
     }
 
-    func testRunnerDrainsLargeOutputAndErrorsAndBoundsPreview() throws {
+    internal func testRunnerDrainsLargeOutputAndErrorsAndBoundsPreview() throws {
         let url = repo()
-        let result = try GitCommand.run(["-c", "yes out | head -c 200000; yes err | head -c 200000 >&2; exit 7"],
-                                        in: url, outputLimit: 1_000, executable: URL(fileURLWithPath: "/bin/sh"))
+        let result = try GitCommand.run(
+            ["-c", "yes out | head -c 200000; yes err | head -c 200000 >&2; exit 7"],
+            in: url,
+            outputLimit: 1_000,
+            executable: URL(fileURLWithPath: "/bin/sh")
+        )
         XCTAssertEqual(result.exitCode, 7)
         XCTAssertEqual(result.stdout.utf8.count, 1_000)
         XCTAssertEqual(result.stderr.utf8.count, 65_536)
         XCTAssertTrue(result.truncated)
         XCTAssertThrowsError(try GitCommand.run([], in: url, executable: URL(fileURLWithPath: "/not/a/command")))
         let start = Date()
-        XCTAssertThrowsError(try GitCommand.run(["-c", "trap '' TERM; while :; do :; done"], in: url,
-                                               timeout: 0.1, executable: URL(fileURLWithPath: "/bin/sh")))
+        XCTAssertThrowsError(
+            try GitCommand.run(
+                ["-c", "trap '' TERM; while :; do :; done"],
+                in: url,
+                timeout: 0.1,
+                executable: URL(fileURLWithPath: "/bin/sh")
+            )
+        )
         XCTAssertLessThan(Date().timeIntervalSince(start), 3)
     }
 
-    func testLargePatchIsExplicitlyTruncated() throws {
+    internal func testLargePatchIsExplicitlyTruncated() throws {
         let url = repo()
         TestSupport.git(["branch", "base"], in: url)
-        TestSupport.write(String(repeating: "a line of text\n", count: 50_000), to: url.appendingPathComponent("large.txt"))
+        TestSupport.write(
+            String(repeating: "a line of text\n", count: 50_000),
+            to: url.appendingPathComponent("large.txt")
+        )
         TestSupport.git(["add", "."], in: url)
         TestSupport.git(["commit", "-m", "large"], in: url)
         let result = try GitReview.compare(in: url, base: "base", target: "main", mode: .tips)
         XCTAssertTrue(try GitReview.patch(in: url, comparison: result, file: XCTUnwrap(result.files.first))
             .contains("Diff preview truncated"))
+    }
+
+    deinit {
+        // Nothing to release; temp dirs are removed in tearDown.
     }
 }
