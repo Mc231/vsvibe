@@ -2,6 +2,7 @@ name: CI
 
 # Gitea pull-mirrors github.com/Mc231/vsvibe, so every mirror sync arrives as a
 # `push` (never `pull_request`). CI never writes back to the origin.
+# `gh-pages` only holds the Sparkle appcast (written by release.yml): skipped.
 #
 # Runner: self-hosted act_runner on the owner's Mac, label `macos`, host mode,
 # capacity 1 (jobs queue). Cheapest failure first: static -> test (+ Sonar on
@@ -9,13 +10,13 @@ name: CI
 
 on:
   push:
-    branches:
-      - '**'
+    branches-ignore:
+      - gh-pages
   workflow_dispatch:
 
 jobs:
   static:
-    name: Lint (SwiftLint strict), shellcheck, actionlint, gitleaks
+    name: Lint (SwiftLint strict), shellcheck, actionlint, gitleaks, tool tests
     runs-on: macos
     timeout-minutes: 15
     steps:
@@ -40,6 +41,9 @@ jobs:
             -ignore 'label "macos" is unknown' \
             -ignore 'the runner of "actions/upload-artifact@v3" action is too old' \
             .gitea/workflows/*.yml
+
+      - name: Release tool tests (appcast + CHANGELOG)
+        run: python3 -I -m unittest discover -s tools -p 'test_*.py'
 
       - name: gitleaks (pushed commit)
         run: gitleaks detect --no-banner --redact --log-opts=-1
@@ -91,6 +95,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Build number = commit count (scripts/build-dmg.sh).
+          fetch-depth: 0
 
       - name: Build ad-hoc signed DMG
         run: scripts/build-dmg.sh
