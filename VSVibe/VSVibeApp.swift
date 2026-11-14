@@ -46,6 +46,10 @@ internal struct VSVibeApp: App {
                 // No help book.
             }
         }
+
+        Settings {
+            SettingsView()
+        }
     }
 
     @CommandsBuilder private var fileCommands: some Commands {
