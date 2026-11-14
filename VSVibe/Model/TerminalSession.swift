@@ -21,6 +21,12 @@ internal final class TerminalSession: Identifiable {
     internal var lastEventAt: Date?
     internal var lastEventLabel: String?
 
+    /// Claude's `session_id` for the conversation running in this pane, from
+    /// hook events carrying this pane's id (the latest wins, e.g. after
+    /// `/clear`), or carried over when the pane was restored. Persisted so the
+    /// next launch can `--resume` it.
+    internal var claudeSessionID: String?
+
     // Token usage from the latest Claude transcript for this folder.
     internal var usage: SessionUsage?
 

@@ -83,7 +83,7 @@ internal final class StatsStore {
             case .subagentStop:
                 day.subagentFinishes += 1
 
-            case .unknown:
+            case .sessionStart, .unknown:
                 break
             }
         }

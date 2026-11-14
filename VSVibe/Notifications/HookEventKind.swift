@@ -1,5 +1,8 @@
 internal enum HookEventKind: String, Codable {
     case notification = "Notification"
+    /// A conversation started, resumed, was cleared or compacted. Only used to
+    /// learn the pane's Claude session id; never notified or counted.
+    case sessionStart = "SessionStart"
     case stop = "Stop"
     case subagentStop = "SubagentStop"
     case unknown = "unknown"
@@ -14,6 +17,9 @@ internal enum HookEventKind: String, Codable {
 
         case .subagentStop:
             "Subagent finished"
+
+        case .sessionStart:
+            "Claude session started"
 
         case .unknown:
             "Claude event"

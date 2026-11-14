@@ -129,8 +129,8 @@ internal final class LaunchAliasStoreTests: XCTestCase {
         try store.save(command: "other", configPath: "")
         let settings = directory.appendingPathComponent("settings.json")
         let hook: [String: Any] = ["hooks": [["_id": HookInstaller.hookCommandIdentifier]]]
-        try JSONSerialization.data(withJSONObject: ["hooks": ["Stop": [hook], "Notification": [hook]]])
-            .write(to: settings)
+        let registered = ["SessionStart": [hook], "Stop": [hook], "Notification": [hook]]
+        try JSONSerialization.data(withJSONObject: ["hooks": registered]).write(to: settings)
         let status = HookInstaller.currentStatus(aliases: store.customAliases)
         XCTAssertEqual(status.aliases.map(\.alias.command), ["work"])
         XCTAssertTrue(try XCTUnwrap(status.aliases.first).isInstalled)

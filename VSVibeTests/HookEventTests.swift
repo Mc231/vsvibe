@@ -60,7 +60,49 @@ internal final class HookEventTests: XCTestCase {
         XCTAssertEqual(decoded.message, "wait")
     }
 
+    internal func testDecodesPaneAndClaudeSessionIDs() throws {
+        let pane = UUID()
+        let event = try decode(
+            #"{"event":"SessionStart","projectDir":"/p","ts":1,"#
+                + #""paneId":"\#(pane.uuidString)","sessionId":"s-1"}"#
+        )
+        XCTAssertEqual(event.event, .sessionStart)
+        XCTAssertEqual(event.paneID, pane)
+        XCTAssertEqual(event.claudeSessionID, "s-1")
+    }
+
+    internal func testEmptyOrMalformedIDsDecodeAsNil() throws {
+        let event = try decode(#"{"event":"Stop","paneId":"not-a-uuid","sessionId":""}"#)
+        XCTAssertNil(event.paneID)
+        XCTAssertNil(event.claudeSessionID)
+        let legacy = try decode(#"{"event":"Stop","projectDir":"/p","ts":1,"message":"done"}"#)
+        XCTAssertNil(legacy.paneID)
+        XCTAssertNil(legacy.claudeSessionID)
+    }
+
+    internal func testClaudeSessionIDFallsBackToPayload() throws {
+        let event = try decode(#"{"event":"Stop","sessionId":"","payload":{"session_id":"from-payload"}}"#)
+        XCTAssertEqual(event.claudeSessionID, "from-payload")
+        XCTAssertNil(event.message)
+    }
+
+    internal func testEncodeRoundTripsIDs() throws {
+        let pane = UUID()
+        let original = HookEvent(
+            event: .stop,
+            projectDir: "/p",
+            timestamp: 1,
+            message: nil,
+            paneID: pane,
+            claudeSessionID: "s-2"
+        )
+        let decoded = try JSONDecoder().decode(HookEvent.self, from: JSONEncoder().encode(original))
+        XCTAssertEqual(decoded.paneID, pane)
+        XCTAssertEqual(decoded.claudeSessionID, "s-2")
+    }
+
     internal func testKindDisplayNames() {
+        XCTAssertEqual(HookEventKind.sessionStart.displayName, "Claude session started")
         XCTAssertEqual(HookEventKind.stop.displayName, "Claude finished")
         XCTAssertEqual(HookEventKind.notification.displayName, "Claude needs input")
         XCTAssertEqual(HookEventKind.subagentStop.displayName, "Subagent finished")

@@ -39,7 +39,7 @@ internal final class SessionLauncherTests: XCTestCase {
 
     internal func testLiveSpawnStartsAShellInTheFolder() {
         let view = SessionLauncher.makeTerminalView()
-        SessionLauncher.live.spawnShell(view, directory)
+        SessionLauncher.live.spawnShell(view, directory, UUID())
         XCTAssertTrue(view.process.running)
         view.process.terminate()
         XCTAssertFalse(view.process.running)

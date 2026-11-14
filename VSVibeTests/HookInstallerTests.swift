@@ -66,13 +66,14 @@ internal final class HookInstallerTests: XCTestCase {
 
     // MARK: - Install
 
-    internal func testInstallWritesScriptAndRegistersStopAndNotification() throws {
+    internal func testInstallWritesScriptAndRegistersSessionStartStopAndNotification() throws {
         let plain = LaunchAlias(command: "plain", claudeConfigDir: nil)
         try HookInstaller.install(aliases: [alias, plain], scriptURL: scriptURL)
 
         XCTAssertTrue(HookInstaller.isScriptInstalled(at: scriptURL))
+        XCTAssertTrue(HookInstaller.isScriptCurrent(at: scriptURL))
         let hooks = try hooks()
-        XCTAssertEqual(Set(hooks.keys), ["Stop", "Notification"])
+        XCTAssertEqual(Set(hooks.keys), ["SessionStart", "Stop", "Notification"])
         let stopEntries = try XCTUnwrap(hooks["Stop"] as? [[String: Any]])
         XCTAssertEqual(stopEntries.count, 1)
         XCTAssertEqual(stopEntries.first?["matcher"] as? String, "")
@@ -84,9 +85,11 @@ internal final class HookInstallerTests: XCTestCase {
         let status = HookInstaller.currentStatus(aliases: [alias, plain], scriptURL: scriptURL)
         XCTAssertTrue(status.scriptInstalled)
         XCTAssertEqual(status.aliases.map(\.id), ["work"])
-        XCTAssertEqual(status.aliases.first?.registeredEvents, ["Stop", "Notification"])
+        XCTAssertEqual(status.aliases.first?.registeredEvents, ["SessionStart", "Stop", "Notification"])
+        XCTAssertFalse(status.scriptOutdated)
         XCTAssertTrue(status.isFullyInstalled)
         XCTAssertFalse(status.isPartiallyInstalled)
+        XCTAssertFalse(status.needsUpdate)
     }
 
     internal func testInstallIsIdempotentAndKeepsForeignHooks() throws {
@@ -118,11 +121,11 @@ internal final class HookInstallerTests: XCTestCase {
         try FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
         try Data().write(to: settingsURL)
         try HookInstaller.installInto(alias: alias)
-        XCTAssertEqual(Set(try hooks().keys), ["Stop", "Notification"])
+        XCTAssertEqual(Set(try hooks().keys), ["SessionStart", "Stop", "Notification"])
 
         try Data("[1, 2]".utf8).write(to: settingsURL)
         try HookInstaller.installInto(alias: alias)
-        XCTAssertEqual(Set(try hooks().keys), ["Stop", "Notification"])
+        XCTAssertEqual(Set(try hooks().keys), ["SessionStart", "Stop", "Notification"])
     }
 
     internal func testAliasWithoutConfigDirIsSkipped() throws {
@@ -143,6 +146,7 @@ internal final class HookInstallerTests: XCTestCase {
                 "Stop": [foreign, ours],
                 "Notification": [ours],
                 "SubagentStop": [ours],
+                "SessionStart": [ours],
                 "PreToolUse": [foreign]
             ]
         ])
@@ -186,7 +190,7 @@ internal final class HookInstallerTests: XCTestCase {
     }
 
     internal func testStatusFlags() {
-        let full = HookInstaller.AliasStatus(alias: alias, registeredEvents: ["Stop", "Notification"])
+        let full = HookInstaller.AliasStatus(alias: alias, registeredEvents: ["SessionStart", "Stop", "Notification"])
         let half = HookInstaller.AliasStatus(
             alias: LaunchAlias(command: "other", claudeConfigDir: configDir),
             registeredEvents: ["Stop"]

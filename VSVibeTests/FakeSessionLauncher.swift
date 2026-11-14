@@ -7,6 +7,7 @@ import Foundation
 @MainActor
 internal final class FakeSessionLauncher {
     internal private(set) var spawnedFolders: [URL] = []
+    internal private(set) var spawnedPaneIDs: [UUID] = []
     internal var onPath: Set<String> = []
     internal let loginShellKnows: Set<String>
 
@@ -14,8 +15,9 @@ internal final class FakeSessionLauncher {
         let known = loginShellKnows
         return SessionLauncher(
             makeTerminalView: SessionLauncher.makeTerminalView,
-            spawnShell: { [weak self] _, folder in
+            spawnShell: { [weak self] _, folder, paneID in
                 self?.spawnedFolders.append(folder)
+                self?.spawnedPaneIDs.append(paneID)
             },
             isOnSearchPath: { [weak self] command in
                 self?.onPath.contains(command) ?? false

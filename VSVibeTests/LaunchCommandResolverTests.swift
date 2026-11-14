@@ -55,6 +55,37 @@ internal final class LaunchCommandResolverTests: XCTestCase {
         XCTAssertEqual(LaunchCommandResolver.continueCommand(for: "claude -c"), "claude -c")
     }
 
+    internal func testResumeCommandAppendsSessionID() {
+        XCTAssertEqual(LaunchCommandResolver.resumeCommand(for: "claude", claudeSessionID: "s1"), "claude --resume s1")
+        XCTAssertEqual(
+            LaunchCommandResolver.resumeCommand(for: "  work --model opus ", claudeSessionID: "s1"),
+            "work --model opus --resume s1"
+        )
+    }
+
+    internal func testResumeCommandReplacesConversationFlags() {
+        let cases = [
+            "claude --continue": "claude --resume new",
+            "claude -c --verbose": "claude --verbose --resume new",
+            "claude --resume old": "claude --resume new",
+            "claude -r old --verbose": "claude --verbose --resume new",
+            "claude --resume=old": "claude --resume new",
+            "claude -r --verbose": "claude --verbose --resume new",
+            "claude --resume": "claude --resume new"
+        ]
+        for (command, expected) in cases {
+            XCTAssertEqual(LaunchCommandResolver.resumeCommand(for: command, claudeSessionID: "new"), expected, command)
+        }
+    }
+
+    internal func testValidClaudeSessionIDs() {
+        XCTAssertTrue(LaunchCommandResolver.isValidClaudeSessionID("0b9c1f2e-4a5d-4e3b-9f00-123456789abc"))
+        XCTAssertTrue(LaunchCommandResolver.isValidClaudeSessionID("abc_DEF-123"))
+        for invalid in ["", "a b", "x;rm -rf ~", "$(id)", "a\nb", "ü", String(repeating: "a", count: 129)] {
+            XCTAssertFalse(LaunchCommandResolver.isValidClaudeSessionID(invalid), invalid)
+        }
+    }
+
     internal func testContinueCommandLeavesEmptyUnchanged() {
         XCTAssertEqual(LaunchCommandResolver.continueCommand(for: ""), "")
         XCTAssertEqual(LaunchCommandResolver.continueCommand(for: "   "), "")

@@ -77,7 +77,9 @@ internal struct HookSetupView: View {
 
             Text(
                 "VSVibe writes a small bash script to `~/.vsvibe/hooks/` and adds entries under "
-                    + "`hooks.Stop` and `hooks.Notification` in each Claude-family alias's settings.json. "
+                    + "`hooks.SessionStart`, `hooks.Stop` and `hooks.Notification` in each Claude-family "
+                    + "alias's settings.json (SessionStart lets VSVibe resume each pane's conversation "
+                    + "after a relaunch). "
                     + "Existing entries are preserved; a `.vsvibe.bak` backup is written next to each file "
                     + "before mutation."
             )
@@ -119,8 +121,10 @@ internal struct HookSetupView: View {
         Text("Hook status").font(.headline)
         statusBlock(
             label: "Hook script",
-            detail: HookInstaller.hookScriptURL.path,
-            isOK: status.scriptInstalled
+            detail: status.scriptOutdated
+                ? "Outdated — click Update Hooks: \(HookInstaller.hookScriptURL.path)"
+                : HookInstaller.hookScriptURL.path,
+            isOK: status.scriptInstalled && !status.scriptOutdated
         )
 
         ForEach(status.aliases) { aliasStatus in
@@ -129,7 +133,7 @@ internal struct HookSetupView: View {
             statusBlock(
                 label: "\(aliasStatus.alias.command) — \(displayPath)",
                 detail: aliasStatus.isInstalled
-                    ? "Stop + Notification registered"
+                    ? "SessionStart + Stop + Notification registered"
                     : aliasStatus.registeredEvents.isEmpty
                         ? "Not registered"
                         : "Partial: \(aliasStatus.registeredEvents.joined(separator: ", "))",
@@ -160,7 +164,7 @@ internal struct HookSetupView: View {
                     }
                 }
             } else {
-                Button(status.isPartiallyInstalled ? "Reinstall Hooks" : "Install Hooks") {
+                Button(status.installActionTitle) {
                     runOperation("Installed hooks for all aliases. Restart any running Claude session to apply.") {
                         try HookInstaller.install(aliases: aliasStore.aliases)
                     }

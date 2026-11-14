@@ -2,9 +2,9 @@ import Foundation
 import SwiftTerm
 
 extension LocalProcessTerminalView {
-    internal func spawnShell(at folder: URL) {
+    internal func spawnShell(at folder: URL, paneID: UUID) {
         let shell = ShellResolver.userLoginShell()
-        let env = EnvBuilder.build()
+        let env = EnvBuilder.build(paneID: paneID)
 
         let escapedPath = folder.path.replacingOccurrences(of: "'", with: "'\\''")
         let escapedShell = shell.replacingOccurrences(of: "'", with: "'\\''")

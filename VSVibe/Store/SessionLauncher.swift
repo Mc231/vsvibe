@@ -28,8 +28,9 @@ internal struct SessionLauncher {
 
     /// Creates the (not yet started) terminal view for a new pane.
     internal var makeTerminalView: () -> LocalProcessTerminalView
-    /// Starts the login shell in `folder` inside the view.
-    internal var spawnShell: (LocalProcessTerminalView, URL) -> Void
+    /// Starts the login shell in `folder` inside the view; the pane id is
+    /// exported to the shell as `VSVIBE_PANE_ID`.
+    internal var spawnShell: (LocalProcessTerminalView, URL, UUID) -> Void
     /// Fast PATH probe for a bare executable name.
     internal var isOnSearchPath: (String) -> Bool
     /// Authoritative (slow) check via the login shell: `(command, shell)`.
@@ -44,8 +45,8 @@ internal struct SessionLauncher {
         return view
     }
 
-    internal static func spawnShell(in view: LocalProcessTerminalView, at folder: URL) {
-        view.spawnShell(at: folder)
+    internal static func spawnShell(in view: LocalProcessTerminalView, at folder: URL, paneID: UUID) {
+        view.spawnShell(at: folder, paneID: paneID)
     }
 
     internal static func isOnSearchPath(_ command: String) -> Bool {

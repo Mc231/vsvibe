@@ -56,34 +56,69 @@ internal final class EventCoordinator {
     }
 
     /// Applies one hook event: updates the matching pane (if any), records it
-    /// in the stats and posts a notification.
+    /// in the stats and posts a notification. `SessionStart` only records the
+    /// pane's Claude session id.
     internal func handle(_ event: HookEvent) {
         lastEvent = event
         Log.app.info("Hook event: \(event.event.rawValue, privacy: .public) dir=\(event.projectDir, privacy: .public)")
 
-        guard let session = matchSession(forProjectDir: event.projectDir) else {
-            Log.app.info("No active session matches projectDir, posting generic notification")
-            if !event.projectDir.isEmpty {
-                statsStore.recordHookEvent(folderURL: URL(fileURLWithPath: event.projectDir), kind: event.event)
-            }
-            notifier.post(
-                title: event.event.displayName,
-                body: bestBody(for: event, folderName: URL(fileURLWithPath: event.projectDir).lastPathComponent),
-                sessionID: nil
-            )
+        let session = matchSession(for: event)
+        if let session {
+            recordClaudeSessionID(of: event, in: session)
+        }
+        guard event.event != .sessionStart else {
+            return
+        }
+        guard let session else {
+            handleUnmatched(event)
             return
         }
 
         applyToSession(session, event: event)
         statsStore.recordHookEvent(folderURL: session.folder.url, kind: event.event)
 
-        let folderName = folderStore.folders.first { $0.id == session.id }?.displayName
+        // The project's current name (it may have been renamed since the pane opened).
+        let folderName = folderStore.folders.first { $0.id == session.folder.id }?.displayName
             ?? session.folder.displayName
         notifier.post(
             title: "\(folderName) — \(event.event.displayName)",
             body: bestBody(for: event, folderName: folderName),
             sessionID: session.id
         )
+    }
+
+    private func handleUnmatched(_ event: HookEvent) {
+        Log.app.info("No active session matches the event, posting generic notification")
+        if !event.projectDir.isEmpty {
+            statsStore.recordHookEvent(folderURL: URL(fileURLWithPath: event.projectDir), kind: event.event)
+        }
+        notifier.post(
+            title: event.event.displayName,
+            body: bestBody(for: event, folderName: URL(fileURLWithPath: event.projectDir).lastPathComponent),
+            sessionID: nil
+        )
+    }
+
+    /// The pane named by the event's `paneId` when it is still open, else the
+    /// first pane whose folder is the event's project dir (events from old hook
+    /// scripts or from terminals outside VSVibe).
+    private func matchSession(for event: HookEvent) -> TerminalSession? {
+        if let paneID = event.paneID, let session = sessionManager.sessions.first(where: { $0.id == paneID }) {
+            return session
+        }
+        return matchSession(forProjectDir: event.projectDir)
+    }
+
+    /// Keeps the latest Claude session id of a pane. Only events carrying the
+    /// pane's own id count: a folder match is ambiguous with several panes.
+    private func recordClaudeSessionID(of event: HookEvent, in session: TerminalSession) {
+        guard event.paneID == session.id,
+            let claudeSessionID = event.claudeSessionID,
+            LaunchCommandResolver.isValidClaudeSessionID(claudeSessionID)
+        else {
+            return
+        }
+        session.claudeSessionID = claudeSessionID
     }
 
     private func matchSession(forProjectDir projectDir: String) -> TerminalSession? {
@@ -110,7 +145,7 @@ internal final class EventCoordinator {
             session.unreadEventCount += 1
             session.lastEventLabel = "Finished"
 
-        case .unknown:
+        case .sessionStart, .unknown:
             break
         }
     }
@@ -129,7 +164,7 @@ internal final class EventCoordinator {
         case .subagentStop:
             return "Subagent finished in \(folderName)."
 
-        case .unknown:
+        case .sessionStart, .unknown:
             return "Event in \(folderName)."
         }
     }

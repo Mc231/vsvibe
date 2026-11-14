@@ -1,6 +1,9 @@
 import Foundation
 
 internal enum EnvBuilder {
+    /// Identifies the pane a shell (and the Claude hooks it runs) belongs to.
+    internal static let paneIDKey = "VSVIBE_PANE_ID"
+
     /// PATH entries the spawned shell starts with: well-known tool dirs
     /// prepended to the inherited PATH, deduplicated in order.
     internal static func searchPaths(extraPaths: [String] = []) -> [String] {
@@ -26,7 +29,10 @@ internal enum EnvBuilder {
         return combined
     }
 
-    internal static func build(extraPaths: [String] = []) -> [String] {
+    /// The environment for a pane's shell. `paneID` is exported as
+    /// `VSVIBE_PANE_ID` so hook events can be routed to that pane; without it
+    /// any inherited value is removed.
+    internal static func build(extraPaths: [String] = [], paneID: UUID? = nil) -> [String] {
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = searchPaths(extraPaths: extraPaths).joined(separator: ":")
 
@@ -34,6 +40,7 @@ internal enum EnvBuilder {
         if env["LANG"] == nil { env["LANG"] = "en_US.UTF-8" }
         env["COLORTERM"] = "truecolor"
         env["VSVIBE"] = "1"
+        env[paneIDKey] = paneID?.uuidString
 
         return env.map { "\($0.key)=\($0.value)" }
     }

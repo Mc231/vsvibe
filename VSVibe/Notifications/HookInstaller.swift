@@ -13,21 +13,45 @@ internal enum HookInstaller {
         internal let registeredEvents: [String]
 
         internal var id: String { alias.id }
+        /// Every event the current installer registers is present.
         internal var isInstalled: Bool {
-            registeredEvents.contains("Stop") && registeredEvents.contains("Notification")
+            HookInstaller.installedEvents.allSatisfy(registeredEvents.contains)
         }
     }
 
     internal struct Status: Equatable {
         internal let scriptInstalled: Bool
+        /// The installed script differs from the one this build writes.
+        internal let scriptOutdated: Bool
         internal let aliases: [AliasStatus]
 
         internal var isFullyInstalled: Bool {
-            scriptInstalled && !aliases.isEmpty && aliases.allSatisfy(\.isInstalled)
+            scriptInstalled && !scriptOutdated && !aliases.isEmpty && aliases.allSatisfy(\.isInstalled)
         }
 
         internal var isPartiallyInstalled: Bool {
             scriptInstalled && aliases.contains(where: \.isInstalled) && !isFullyInstalled
+        }
+
+        /// Installed by an older VSVibe: the script is outdated or an alias has
+        /// some, but not all, of the events the current version registers.
+        internal var needsUpdate: Bool {
+            scriptInstalled
+                && (scriptOutdated || aliases.contains { !$0.isInstalled && !$0.registeredEvents.isEmpty })
+        }
+
+        /// Title of the install button in the hook setup UI.
+        internal var installActionTitle: String {
+            if needsUpdate {
+                return "Update Hooks"
+            }
+            return isPartiallyInstalled ? "Reinstall Hooks" : "Install Hooks"
+        }
+
+        internal init(scriptInstalled: Bool, aliases: [AliasStatus], scriptOutdated: Bool = false) {
+            self.scriptInstalled = scriptInstalled
+            self.scriptOutdated = scriptOutdated
+            self.aliases = aliases
         }
     }
 
@@ -40,50 +64,12 @@ internal enum HookInstaller {
     nonisolated internal static let eventsFileURL: URL = appDir.appendingPathComponent("events.jsonl")
     nonisolated internal static let hookCommandIdentifier = "vsvibe:claude-notify"
 
-    /// Events the installer registers.
-    private static let installedEvents = ["Stop", "Notification"]
+    /// Events the installer registers. `SessionStart` tells VSVibe each pane's
+    /// Claude session id before the first turn finishes (and after `/clear`).
+    nonisolated internal static let installedEvents = ["SessionStart", "Stop", "Notification"]
     /// Events the installer recognises (and cleans up) as its own.
-    private static let managedEvents = ["Stop", "Notification", "SubagentStop"]
+    private static let managedEvents = ["SessionStart", "Stop", "Notification", "SubagentStop"]
     private static let scriptPermissions: Int16 = 0o755
-
-    private static let scriptContents: String = #"""
-#!/usr/bin/env bash
-# Installed by VSVibe — appends a JSON line per Claude hook event.
-# id: vsvibe:claude-notify
-set -uo pipefail
-
-EVENT="${1:-Unknown}"
-EVENTS_FILE="${HOME}/.vsvibe/events.jsonl"
-mkdir -p "$(dirname "$EVENTS_FILE")"
-
-TS=$(date +%s)
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${PWD}}"
-PAYLOAD=$(cat 2>/dev/null || true)
-
-esc() {
-  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e ':a;N;$!ba;s/\n/\\n/g' -e 's/\t/\\t/g' -e 's/\r/\\r/g'
-}
-
-MSG=""
-if [ -n "$PAYLOAD" ]; then
-  if command -v python3 >/dev/null 2>&1; then
-    MSG=$(printf '%s' "$PAYLOAD" | python3 -c 'import sys,json
-try:
-  d=json.loads(sys.stdin.read())
-  print(d.get("message",""))
-except Exception:
-  pass' 2>/dev/null || true)
-  fi
-fi
-
-ESC_PROJECT=$(esc "$PROJECT_DIR")
-ESC_MSG=$(esc "$MSG")
-
-LINE="{\"event\":\"${EVENT}\",\"projectDir\":\"${ESC_PROJECT}\",\"ts\":${TS},\"message\":\"${ESC_MSG}\"}"
-printf '%s\n' "$LINE" >> "$EVENTS_FILE"
-
-exit 0
-"""#
 
     // MARK: - Status
 
@@ -93,6 +79,11 @@ exit 0
 
     internal static func isScriptInstalled(at scriptURL: URL) -> Bool {
         FileManager.default.fileExists(atPath: scriptURL.path)
+    }
+
+    /// Whether the script at `scriptURL` is exactly the one this build writes.
+    internal static func isScriptCurrent(at scriptURL: URL) -> Bool {
+        (try? String(contentsOf: scriptURL, encoding: .utf8)) == HookScript.contents
     }
 
     internal static func currentStatus(aliases: [LaunchAlias], scriptURL: URL = hookScriptURL) -> Status {
@@ -105,7 +96,11 @@ exit 0
                 .flatMap { ($0["hooks"] as? [String: Any]).map(registeredEvents(in:)) } ?? []
             return AliasStatus(alias: alias, registeredEvents: events)
         }
-        return Status(scriptInstalled: scriptOK, aliases: aliasStatuses)
+        return Status(
+            scriptInstalled: scriptOK,
+            aliases: aliasStatuses,
+            scriptOutdated: scriptOK && !isScriptCurrent(at: scriptURL)
+        )
     }
 
     // MARK: - Install / Uninstall
@@ -114,7 +109,7 @@ exit 0
         let fileManager = FileManager.default
         let dir = scriptURL.deletingLastPathComponent()
         try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
-        try scriptContents.write(to: scriptURL, atomically: true, encoding: .utf8)
+        try HookScript.contents.write(to: scriptURL, atomically: true, encoding: .utf8)
         try fileManager.setAttributes([.posixPermissions: scriptPermissions], ofItemAtPath: scriptURL.path)
     }
 

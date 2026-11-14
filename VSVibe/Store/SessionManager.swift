@@ -138,7 +138,7 @@ internal final class SessionManager {
         openedAt[session.id] = Date()
         statsStore.recordPaneOpened(folderURL: folder.url)
 
-        launcher.spawnShell(terminalView, folder.url)
+        launcher.spawnShell(terminalView, folder.url, session.id)
 
         // Inject launch command after the shell has initialized.
         let command = commandOverride ?? folder.launchCommand

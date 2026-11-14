@@ -3,6 +3,16 @@ import Foundation
 internal enum LaunchCommandResolver {
     internal static let defaultCommand = "claude"
 
+    /// Longest Claude session id accepted for `--resume` (ids are UUIDs).
+    private static let maxClaudeSessionIDLength = 128
+    private static let claudeSessionIDCharacters = CharacterSet(
+        charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+    )
+    /// Flags that pick a conversation and would conflict with `--resume <id>`.
+    private static let conversationFlags: Set<String> = ["--continue", "-c"]
+    /// Flags that may take the conversation id as their next argument.
+    private static let resumeFlags: Set<String> = ["--resume", "-r"]
+
     /// Known launch aliases. For Claude-family aliases, the `claudeConfigDir`
     /// tells us where to install Stop/Notification hooks. opencode uses its
     /// own event system and is treated separately.
@@ -50,6 +60,39 @@ internal enum LaunchCommandResolver {
             return trimmed
         }
         return trimmed + " --continue"
+    }
+
+    /// Whether `id` is safe to type into a shell as a `--resume` argument:
+    /// non-empty, bounded, and only letters, digits, `-` and `_`.
+    internal static func isValidClaudeSessionID(_ id: String) -> Bool {
+        !id.isEmpty
+            && id.count <= maxClaudeSessionIDLength
+            && id.unicodeScalars.allSatisfy { claudeSessionIDCharacters.contains($0) }
+    }
+
+    /// Builds the command that resumes one specific Claude conversation:
+    /// `command` with any `--continue`/`-c`/`--resume [x]`/`-r [x]` removed and
+    /// `--resume <claudeSessionID>` appended. Callers validate the id first
+    /// (`isValidClaudeSessionID`).
+    internal static func resumeCommand(for command: String, claudeSessionID: String) -> String {
+        let tokens = command.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: " ")
+            .map(String.init)
+        var kept: [String] = []
+        var index = tokens.startIndex
+        while index < tokens.endIndex {
+            let token = tokens[index]
+            index += 1
+            if resumeFlags.contains(token) {
+                // Drop the flag's value too, unless the next token is another flag.
+                if index < tokens.endIndex, !tokens[index].hasPrefix("-") {
+                    index += 1
+                }
+            } else if !conversationFlags.contains(token), !token.hasPrefix("--resume=") {
+                kept.append(token)
+            }
+        }
+        return (kept + ["--resume", claudeSessionID]).joined(separator: " ")
     }
 
     /// All folders use the same default; custom commands are selected explicitly.

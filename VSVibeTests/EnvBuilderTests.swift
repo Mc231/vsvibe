@@ -33,6 +33,13 @@ internal final class EnvBuilderTests: XCTestCase {
         XCTAssertEqual(parts.count, Set(parts).count)
     }
 
+    internal func testExportsPaneIDOnlyWhenGiven() {
+        let paneID = UUID()
+        XCTAssertEqual(dict(EnvBuilder.build(paneID: paneID))[EnvBuilder.paneIDKey], paneID.uuidString)
+        XCTAssertEqual(EnvBuilder.paneIDKey, "VSVIBE_PANE_ID")
+        XCTAssertNil(dict(EnvBuilder.build())[EnvBuilder.paneIDKey])
+    }
+
     internal func testExtraPathsIncluded() {
         let env = dict(EnvBuilder.build(extraPaths: ["/custom/tool/bin"]))
         XCTAssertTrue((env["PATH"] ?? "").contains("/custom/tool/bin"))
