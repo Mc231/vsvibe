@@ -45,7 +45,7 @@ jobs:
         run: gitleaks detect --no-banner --redact --log-opts=-1
 
   test:
-    name: Build, test, coverage gate${{ github.ref == 'refs/heads/main' && ', SonarQube' || '' }}
+    name: Build, test, coverage gate (+ SonarQube on main)
     needs: static
     runs-on: macos
     timeout-minutes: 45
