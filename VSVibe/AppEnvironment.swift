@@ -10,6 +10,7 @@ internal final class AppEnvironment {
     internal let eventCoordinator: EventCoordinator
     internal let diskSpaceMonitor: DiskSpaceMonitor
     internal let statsStore: StatsStore
+    internal let sessionRestore: SessionRestoreController
     internal var pendingEditor: ProjectEditorMode?
     internal var pendingLabelEditor: LabelEditorMode?
     internal var isManageLabelsPresented: Bool = false
@@ -39,6 +40,9 @@ internal final class AppEnvironment {
         self.sessionManager = manager
         self.eventCoordinator = EventCoordinator(folderStore: store, sessionManager: manager, statsStore: stats)
         self.diskSpaceMonitor = DiskSpaceMonitor()
+        self.sessionRestore = SessionRestoreController(sessionManager: manager, folderStore: store) { command in
+            aliases.alias(for: command)
+        }
     }
 
     internal func showStats(folder: FolderEntry) {
@@ -52,6 +56,10 @@ internal final class AppEnvironment {
     internal func startEventStream() {
         eventCoordinator.start()
         diskSpaceMonitor.start()
+        // Never touch the user's panes or sessions.json from the unit-test host.
+        if !SessionRestoreController.isUnitTestHost(environment: ProcessInfo.processInfo.environment) {
+            sessionRestore.start()
+        }
     }
 
     internal func presentHookSetup() {

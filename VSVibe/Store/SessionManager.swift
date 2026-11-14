@@ -17,6 +17,14 @@ internal final class SessionManager {
     @ObservationIgnored private let aliasStore: LaunchAliasStore
     @ObservationIgnored private let launcher: SessionLauncher
 
+    /// The open panes (in order) and focus, as persisted for restore on launch.
+    internal var snapshot: SessionSnapshot {
+        SessionSnapshot(
+            panes: sessions.map { PaneSnapshot(folderID: $0.folder.id, claudeSessionID: $0.claudeSessionID) },
+            focusedIndex: focusedSessionID.flatMap { id in sessions.firstIndex { $0.id == id } }
+        )
+    }
+
     internal init(statsStore: StatsStore, aliasStore: LaunchAliasStore, launcher: SessionLauncher? = nil) {
         self.aliasStore = aliasStore
         self.statsStore = statsStore
@@ -36,6 +44,21 @@ internal final class SessionManager {
     internal func createSession(for folder: FolderEntry) -> TerminalSession {
         let session = makeSession(for: folder)
         focusedSessionID = session.id
+        return session
+    }
+
+    /// Opens a pane restored from a previous launch: `command` is typed instead
+    /// of the folder's launch command (e.g. `claude --resume <id>`) and the
+    /// Claude conversation id is carried over, so a later relaunch resumes it
+    /// again. Focus is left to the caller.
+    @discardableResult
+    internal func restoreSession(
+        for folder: FolderEntry,
+        command: String,
+        claudeSessionID: String?
+    ) -> TerminalSession {
+        let session = makeSession(for: folder, commandOverride: command)
+        session.claudeSessionID = claudeSessionID
         return session
     }
 

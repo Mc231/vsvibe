@@ -40,6 +40,11 @@ internal final class AppPathsTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path))
     }
 
+    internal func testSessionsFileLivesInAppDirectory() {
+        XCTAssertEqual(AppPaths.sessionsFile.lastPathComponent, "sessions.json")
+        XCTAssertEqual(AppPaths.sessionsFile.deletingLastPathComponent(), AppPaths.applicationSupportDirectory)
+    }
+
     deinit {
         // Temp directories are removed in tearDown.
     }

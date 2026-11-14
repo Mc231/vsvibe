@@ -17,6 +17,11 @@ internal enum AppPaths {
         applicationSupportDirectory.appendingPathComponent("stats.json", isDirectory: false)
     }
 
+    /// Panes to reopen on the next launch (`SessionSnapshot`).
+    internal static var sessionsFile: URL {
+        applicationSupportDirectory.appendingPathComponent("sessions.json", isDirectory: false)
+    }
+
     internal static var aliasesFile: URL {
         applicationSupportDirectory.appendingPathComponent("aliases.json", isDirectory: false)
     }
