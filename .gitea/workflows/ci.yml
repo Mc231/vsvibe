@@ -2,7 +2,9 @@ name: CI
 
 # Gitea pull-mirrors github.com/Mc231/vsvibe, so every mirror sync arrives as a
 # `push` (never `pull_request`). CI never writes back to the origin.
-# `gh-pages` only holds the Sparkle appcast (written by release.yml): skipped.
+# `gh-pages` only holds the Sparkle appcast (written by release.yml): skipped by
+# the `if:` on `static` (every other job needs it). Not `branches-ignore`: Gitea
+# then never starts runs for mirror-sync pushes.
 #
 # Runner: self-hosted act_runner on the owner's Mac, label `macos`, host mode,
 # capacity 1 (jobs queue). Cheapest failure first: static -> test (+ Sonar on
@@ -10,13 +12,14 @@ name: CI
 
 on:
   push:
-    branches-ignore:
-      - gh-pages
+    branches:
+      - '**'
   workflow_dispatch:
 
 jobs:
   static:
     name: Lint (SwiftLint strict), shellcheck, actionlint, gitleaks, tool tests
+    if: github.ref != 'refs/heads/gh-pages'
     runs-on: macos
     timeout-minutes: 15
     steps:
