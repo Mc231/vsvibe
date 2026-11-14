@@ -17,11 +17,19 @@ settings:
     # Strict: warnings fail the build (Sonar imports compiler warnings as issues).
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
+    # Local/dev defaults. Release builds override both from the tag
+    # (scripts/build-dmg.sh): MARKETING_VERSION = tag minus "v",
+    # CURRENT_PROJECT_VERSION = `git rev-list --count HEAD` (Sparkle compares it).
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "1"
 
 packages:
   SwiftTerm:
     url: https://github.com/migueldeicaza/SwiftTerm
     exactVersion: 1.12.0
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
 
 targets:
   VSVibe:
@@ -39,12 +47,17 @@ targets:
       properties:
         CFBundleName: VSVibe
         CFBundleDisplayName: VSVibe
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSMinimumSystemVersion: "15.0"
         NSHumanReadableCopyright: "© 2026 Volodymyr Shyrochuk"
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true
+        # Sparkle 2 (auto-update). Feed = gh-pages, written by release.yml.
+        SUFeedURL: "https://mc231.github.io/vsvibe/appcast.xml"
+        # Public half of the Sparkle EdDSA key (private: Gitea secret SPARKLE_ED_PRIVATE_KEY).
+        SUPublicEDKey: "wbVpuyijKcSN+CXMeK994s7n4FIV7J8+FqQjoUeLx1k=" # gitleaks:allow (public key)
+        SUEnableAutomaticChecks: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.shyrochuk.vsvibe
@@ -55,6 +68,7 @@ targets:
         COMBINE_HIDPI_IMAGES: YES
     dependencies:
       - package: SwiftTerm
+      - package: Sparkle
 
   VSVibeTests:
     type: bundle.unit-test
