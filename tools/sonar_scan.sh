@@ -68,7 +68,7 @@ grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"' <<<"$status" || unavailable "So
 
 [[ -d "$ROOT/build/ci/result.xcresult" ]] || { summary "FAILED: build/ci/result.xcresult missing (run tools/test.sh)"; exit 1; }
 
-VERSION="$(sed -n 's/.*CFBundleShortVersionString: *"\(.*\)".*/\1/p' "$ROOT/project.yml" | head -1)"
+VERSION="$(sed -n 's/.*MARKETING_VERSION: *"\(.*\)".*/\1/p' "$ROOT/project.yml" | head -1)"
 
 WORK="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/sonar_scan.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT

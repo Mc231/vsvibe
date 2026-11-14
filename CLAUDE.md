@@ -91,13 +91,48 @@ Persisted state lives in `~/Library/Application Support/VSVibe/`.
   - `ci.yml`, on every branch: static (SwiftLint, shellcheck, actionlint,
     gitleaks), then test + coverage + `swiftlint analyze`. On `main` it also
     runs the Sonar scan and gate, plus an **ad-hoc signed DMG** artifact.
-  - `release.yml` on a `v*` tag (must equal `v` + `CFBundleShortVersionString`):
-    tests, then a **Developer ID signed, notarized, stapled DMG** artifact (runner
-    keychain needs the certificate and the `vsvibe-notary` profile, see
-    `scripts/NOTARIZE.md`).
+  - `release.yml` on a `v*` tag: tests, then a **Developer ID signed, notarized,
+    stapled DMG** published as a GitHub Release plus a Sparkle appcast entry (see
+    "Releases and auto-update").
 - Before pushing: `tools/lint.sh && tools/test.sh && tools/lint.sh --analyze`.
 
-### Testing rule
+## Session restore
+
+With *Settings → General → Restore sessions on launch* on (the default), VSVibe
+saves the open panes to `sessions.json` in Application Support (debounced on
+every change, and on quit) and reopens them in the same order on launch: normal
+quit, crash and update relaunch. Each pane's shell exports `VSVIBE_PANE_ID`; the
+Claude hook script (v2, also registers `SessionStart`) records it with Claude's
+`session_id`, so hook events reach the exact pane even with several panes per
+folder, and a restored pane runs `<launch command> --resume <id>` to continue
+its own conversation. Panes with no known conversation (hooks missing/outdated,
+not a Claude command) just rerun their launch command; panes of removed projects
+are skipped; scrollback is not restored. After upgrading, click **Update Hooks**
+in *Aliases & Claude Hooks…*. Code: `VSVibe/Restore/`.
+
+## Releases and auto-update
+
+VSVibe updates itself with **Sparkle 2** (SPM). Code is in `VSVibe/Updates/`
+(`AppUpdating` protocol, `UpdateViewModel`, `RelaunchGuard`, which asks before a
+relaunch would close panes that won't be restored; the Sparkle glue
+`SparkleUpdater`/`SparkleUpdaterDelegate` is coverage-excluded). The Settings
+window (`UI/Settings/SettingsView.swift`, one file per tab) has General and
+Updates tabs; "Check for Updates…" is in the app menu. Feed:
+`https://mc231.github.io/vsvibe/appcast.xml` (`gh-pages` branch); DMGs are
+GitHub Release assets. `MARKETING_VERSION` comes from the tag and
+`CURRENT_PROJECT_VERSION` is `git rev-list --count HEAD`; project.yml only holds
+local defaults.
+
+**To release:** add a `## [X.Y.Z]` section to `CHANGELOG.md` (required), commit,
+push `main` and the tag `vX.Y.Z` to GitHub. `release.yml` tests, signs with
+Developer ID from a temporary keychain, notarizes with the App Store Connect API
+key, staples, signs the DMG for Sparkle, creates the GitHub Release and updates
+the appcast. `tools/appcast.py` (tested by `tools/test_appcast.py`) builds notes
+and the appcast; `scripts/sparkle-tool.sh` finds Sparkle's CLI tools. Never
+commit the Sparkle private key (`.secrets/`, Gitea secret
+`SPARKLE_ED_PRIVATE_KEY`). One-time setup: `scripts/NOTARIZE.md`.
+
+## Testing rule
 
 All non-UI logic must be covered by unit tests, with a target of **≥90% line
 coverage on the testable core**. The "testable core" is everything that is not a

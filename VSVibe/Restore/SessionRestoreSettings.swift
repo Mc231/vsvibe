@@ -16,4 +16,10 @@ internal struct SessionRestoreSettings {
     internal init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
+
+    /// How many of the `running` panes a relaunch (e.g. installing an update)
+    /// would lose: none when they are restored on the next launch.
+    internal func sessionsLostOnRelaunch(running: Int) -> Int {
+        isEnabled ? 0 : running
+    }
 }

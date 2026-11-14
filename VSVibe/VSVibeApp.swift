@@ -7,7 +7,8 @@ internal struct VSVibeApp: App {
         static let minWindowHeight: CGFloat = 600
     }
 
-    @State private var env = AppEnvironment()
+    @State private var env: AppEnvironment
+    @State private var updates: UpdateViewModel
     // SwiftUI installs the delegate by reflection; the analyzer can't see that.
     @NSApplicationDelegateAdaptor(AppDelegate.self)
     private var appDelegate // swiftlint:disable:this unused_declaration
@@ -32,6 +33,9 @@ internal struct VSVibeApp: App {
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .commands {
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesButton(model: updates)
+            }
             CommandGroup(replacing: .newItem) {
                 // Hide the default "New Window" item.
             }
@@ -48,7 +52,7 @@ internal struct VSVibeApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsView(updates: updates)
         }
     }
 
@@ -88,6 +92,14 @@ internal struct VSVibeApp: App {
     }
 
     internal init() {
+        let environment = AppEnvironment()
+        _env = State(initialValue: environment)
+        // Installing an update relaunches the app; panes are lost unless restore is on.
+        let updater = SparkleUpdater {
+            SessionRestoreSettings().sessionsLostOnRelaunch(running: environment.sessionManager.sessions.count)
+        }
+        let info = Bundle.main.infoDictionary ?? [:]
+        _updates = State(initialValue: UpdateViewModel(updater: updater, infoDictionary: info))
         // Don't let macOS restore stale windows that would duplicate panes.
         UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
     }

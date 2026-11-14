@@ -6,11 +6,17 @@ internal struct SettingsView: View {
         static let width: CGFloat = 480
     }
 
+    internal let updates: UpdateViewModel
+
     internal var body: some View {
         TabView {
             GeneralSettingsTab()
                 .tabItem {
                     Label("General", systemImage: "gearshape")
+                }
+            UpdatesSettingsTab(model: updates)
+                .tabItem {
+                    Label("Updates", systemImage: "arrow.down.circle")
                 }
         }
         .frame(width: Layout.width)
