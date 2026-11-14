@@ -47,3 +47,6 @@ Package.resolved
 
 # Sonar scanner work dir
 .scannerwork/
+
+# Python bytecode (tools/*.py)
+__pycache__/
