@@ -42,8 +42,8 @@ root, so new `.swift` files there are picked up on regenerate). Tests live under
   "Ungrouped" bucket.
 - `SessionManager` — terminal sessions and their per-session trackers
   (`UsageTracker`, `GitBranchTracker`); records pane lifecycle into `StatsStore`.
-- `EventCoordinator` / `EventWatcher` — Claude hook events (Stop / Notification /
-  SubagentStop); records hook activity into `StatsStore`.
+- `EventCoordinator` / `EventWatcher` — Claude hook events (SessionStart / Stop /
+  Notification; SessionStart only links a pane to its Claude conversation); records hook activity into `StatsStore`.
 - `StatsStore` — persisted per-project statistics (`stats.json`), per-day
   buckets. Runtime events are recorded on the main actor; Claude usage is scanned
   from transcripts off-main and merged as additive deltas.
@@ -108,7 +108,8 @@ folder, and a restored pane runs `<launch command> --resume <id>` to continue
 its own conversation. Panes with no known conversation (hooks missing/outdated,
 not a Claude command) just rerun their launch command; panes of removed projects
 are skipped; scrollback is not restored. After upgrading, click **Update Hooks**
-in *Aliases & Claude Hooks…*. Code: `VSVibe/Restore/`.
+in *Aliases & Claude Hooks…* and restart running Claude sessions. Details:
+`docs/session-restore.md`. Code: `VSVibe/Restore/`.
 
 ## Releases and auto-update
 
@@ -130,7 +131,8 @@ key, staples, signs the DMG for Sparkle, creates the GitHub Release and updates
 the appcast. `tools/appcast.py` (tested by `tools/test_appcast.py`) builds notes
 and the appcast; `scripts/sparkle-tool.sh` finds Sparkle's CLI tools. Never
 commit the Sparkle private key (`.secrets/`, Gitea secret
-`SPARKLE_ED_PRIVATE_KEY`). One-time setup: `scripts/NOTARIZE.md`.
+`SPARKLE_ED_PRIVATE_KEY`). One-time setup: `scripts/NOTARIZE.md`. Details:
+`docs/auto-update-and-releases.md`.
 
 ## Testing rule
 

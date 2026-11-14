@@ -93,6 +93,14 @@ NOTARIZE=1 scripts/build-dmg.sh   # Developer ID signed + notarized + stapled
 See [`scripts/NOTARIZE.md`](scripts/NOTARIZE.md) for the one-time
 notarization setup.
 
+## Session restore and auto-update
+
+- [Session restore](docs/session-restore.md): panes reopen on launch and each
+  Claude pane resumes its own conversation (Settings → General).
+- [Auto-update and releases](docs/auto-update-and-releases.md): Sparkle 2
+  updates (Settings → Updates, "Check for Updates…") and the notarized release
+  pipeline triggered by a `vX.Y.Z` tag.
+
 ## Project layout
 
 ```
