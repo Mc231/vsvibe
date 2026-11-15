@@ -21,7 +21,9 @@ is missing.
   downloads on or off.
 - **Session restore**: open panes come back after the app relaunches (on by
   default, can be turned off in Settings). When it is off, installing an update
-  asks before closing running sessions.
+  asks before closing running sessions. Each Claude pane resumes its own
+  conversation with the alias (Claude config dir / account) that ran it; click
+  **Update Hooks** in *Aliases & Claude Hooks…* once after updating.
 - Developer ID signed, notarized release DMGs published on GitHub Releases.
 
 ### Changed

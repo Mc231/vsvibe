@@ -102,12 +102,19 @@ With *Settings → General → Restore sessions on launch* on (the default), VSV
 saves the open panes to `sessions.json` in Application Support (debounced on
 every change, and on quit) and reopens them in the same order on launch: normal
 quit, crash and update relaunch. Each pane's shell exports `VSVIBE_PANE_ID`; the
-Claude hook script (v2, also registers `SessionStart`) records it with Claude's
-`session_id`, so hook events reach the exact pane even with several panes per
-folder, and a restored pane runs `<launch command> --resume <id>` to continue
-its own conversation. Panes with no known conversation (hooks missing/outdated,
-not a Claude command) just rerun their launch command; panes of removed projects
-are skipped; scrollback is not restored. After upgrading, click **Update Hooks**
+Claude hook script (v3, also registers `SessionStart`) records it with Claude's
+`session_id` and `transcript_path`, so hook events reach the exact pane even
+with several panes per folder, and a restored pane runs
+`<command> --resume <id>` to continue its own conversation. `<command>` is the
+alias whose `claudeConfigDir` holds the transcript (`<config>/projects/…`), so a
+conversation run by another alias / Claude account resumes against the right
+config dir; without a recorded path (or no matching alias) it is the project's
+launch command. A transcript that no longer exists means no `--resume`. Panes
+with no known conversation (hooks missing/outdated, not a Claude command) just
+rerun their launch command; panes of removed projects are skipped; scrollback is
+not restored; `sessions.json` (format v2) from a newer version is ignored. The
+plan (`SessionRestorePlan`) is pure: alias lookups and the file-existence check
+are injected. After upgrading, click **Update Hooks**
 in *Aliases & Claude Hooks…* and restart running Claude sessions. Details:
 `docs/session-restore.md`. Code: `VSVibe/Restore/`.
 
