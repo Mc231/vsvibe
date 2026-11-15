@@ -9,8 +9,7 @@ internal struct TranscriptUsageReader {
     /// Default number of bytes read per poll (256 KiB).
     internal static let defaultChunkSize = 262_144
 
-    internal let folderURL: URL
-    internal let configDir: URL
+    internal let source: TranscriptSource
     internal var chunkSize: Int
     internal private(set) var hasMoreData = false
     private var currentTranscript: URL?
@@ -18,16 +17,14 @@ internal struct TranscriptUsageReader {
     private var partial = Data()
     private var usage = SessionUsage()
 
-    internal init(folderURL: URL, configDir: URL, chunkSize: Int = defaultChunkSize) {
-        self.folderURL = folderURL
-        self.configDir = configDir
+    internal init(source: TranscriptSource, chunkSize: Int = defaultChunkSize) {
+        self.source = source
         self.chunkSize = chunkSize
     }
 
     internal mutating func poll() -> SessionUsage? {
         hasMoreData = false
-        let projectDir = TranscriptLocator.projectDir(claudeConfigDir: configDir, folderURL: folderURL)
-        guard let latest = TranscriptLocator.latestTranscript(in: projectDir) else {
+        guard let latest = source.currentTranscript() else {
             return nil
         }
 

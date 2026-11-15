@@ -1,8 +1,9 @@
 import Foundation
 
-/// Watches a Claude transcript directory for a single pane and surfaces token
-/// usage. Polls every `pollInterval` for new JSONL lines, parsing each
-/// assistant message's `usage` block to maintain running totals + last context.
+/// Watches the Claude transcript of a single pane (`TranscriptSource`) and
+/// surfaces token usage. Polls every `pollInterval` for new JSONL lines, off
+/// the main thread, parsing each assistant message's `usage` block to maintain
+/// running totals + last context.
 @MainActor
 internal final class UsageTracker {
     private enum Constants {
@@ -13,28 +14,25 @@ internal final class UsageTracker {
         static let catchUpDelayNanoseconds: UInt64 = 10_000_000
     }
 
-    internal let folderURL: URL
-    internal let configDir: URL
+    internal let source: TranscriptSource
     private let pollInterval: TimeInterval = 1.5
     private let onUpdate: (SessionUsage) -> Void
 
     private var pollingTask: Task<Void, Never>?
     private var generation = UUID()
 
-    internal init(folderURL: URL, configDir: URL, onUpdate: @escaping (SessionUsage) -> Void) {
-        self.folderURL = folderURL
-        self.configDir = configDir
+    internal init(source: TranscriptSource, onUpdate: @escaping (SessionUsage) -> Void) {
+        self.source = source
         self.onUpdate = onUpdate
     }
 
     internal func start() {
         stop()
         let generation = generation
-        let folder = folderURL
-        let config = configDir
+        let source = source
         let interval = UInt64(pollInterval * Constants.nanosecondsPerSecond)
         pollingTask = Task.detached(priority: .utility) { [weak self] in
-            var reader = TranscriptUsageReader(folderURL: folder, configDir: config)
+            var reader = TranscriptUsageReader(source: source)
             do {
                 try await Task.sleep(nanoseconds: Constants.initialDelayNanoseconds)
                 while !Task.isCancelled {

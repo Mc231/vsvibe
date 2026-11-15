@@ -30,7 +30,9 @@ internal final class TerminalSession: Identifiable {
     /// it): which config dir, and so which alias, owns the conversation.
     internal var claudeTranscriptPath: String?
 
-    // Token usage from the latest Claude transcript for this folder.
+    /// Token usage of this pane's Claude conversation: its own transcript once
+    /// a hook event reported it, before that the folder's latest transcript
+    /// under the launch command's alias.
     internal var usage: SessionUsage?
 
     // Current git branch for the folder, nil when not a git repo.

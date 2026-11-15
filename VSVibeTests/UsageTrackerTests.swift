@@ -9,6 +9,10 @@ internal final class UsageTrackerTests: XCTestCase {
         config.appendingPathComponent("project")
     }
 
+    private var latest: TranscriptSource {
+        .latest(folderURL: folder, configDir: config)
+    }
+
     private var transcript: URL {
         TranscriptLocator.projectDir(claudeConfigDir: config, folderURL: folder)
             .appendingPathComponent("session.jsonl")
@@ -39,7 +43,7 @@ internal final class UsageTrackerTests: XCTestCase {
     }
 
     internal func testIncrementalReadIncompleteLinesAndMalformedRecords() throws {
-        var reader = TranscriptUsageReader(folderURL: folder, configDir: config)
+        var reader = TranscriptUsageReader(source: latest)
         XCTAssertNil(reader.poll())
         let malformed = "\nnot json\n{}\n{\"type\":\"user\"}\n{\"type\":\"assistant\"}\n"
         let modelOnly = "{\"type\":\"assistant\",\"message\":{\"model\":\"test\"}}\n"
@@ -64,7 +68,7 @@ internal final class UsageTrackerTests: XCTestCase {
 
     internal func testLargeTranscriptProcessesBoundedChunksWithoutDoubleCounting() throws {
         TestSupport.write(String(repeating: line, count: 4_000), to: transcript)
-        var reader = TranscriptUsageReader(folderURL: folder, configDir: config, chunkSize: 4_096)
+        var reader = TranscriptUsageReader(source: latest, chunkSize: 4_096)
         var latest = reader.poll()
         XCTAssertTrue(reader.hasMoreData)
         XCTAssertLessThan(try XCTUnwrap(latest).messageCount, 100)
@@ -80,7 +84,7 @@ internal final class UsageTrackerTests: XCTestCase {
 
     internal func testTruncationAndTranscriptRotationResetTotals() throws {
         TestSupport.write(line + line, to: transcript)
-        var reader = TranscriptUsageReader(folderURL: folder, configDir: config)
+        var reader = TranscriptUsageReader(source: latest)
         XCTAssertEqual(reader.poll()?.messageCount, 2)
         TestSupport.write(line, to: transcript)
         XCTAssertEqual(reader.poll()?.messageCount, 1)
@@ -95,7 +99,7 @@ internal final class UsageTrackerTests: XCTestCase {
 
     internal func testMissingUsageFieldsDefaultToZeroAndChunksCanSplitEveryByte() {
         TestSupport.write("{\"type\":\"assistant\",\"message\":{\"usage\":{}}}\n", to: transcript)
-        var reader = TranscriptUsageReader(folderURL: folder, configDir: config, chunkSize: 1)
+        var reader = TranscriptUsageReader(source: latest, chunkSize: 1)
         var latest = reader.poll()
         while reader.hasMoreData {
             if let update = reader.poll() {
@@ -112,7 +116,7 @@ internal final class UsageTrackerTests: XCTestCase {
         TestSupport.write(line, to: transcript)
         let updated = expectation(description: "usage delivered")
         var deliveries = 0
-        let tracker = UsageTracker(folderURL: folder, configDir: config) { usage in
+        let tracker = UsageTracker(source: latest) { usage in
             XCTAssertTrue(Thread.isMainThread)
             XCTAssertEqual(usage.messageCount, 1)
             deliveries += 1
@@ -124,6 +128,46 @@ internal final class UsageTrackerTests: XCTestCase {
         tracker.stop()
         try? await Task.sleep(nanoseconds: 600_000_000)
         XCTAssertEqual(deliveries, 1)
+    }
+
+    // MARK: - Transcript source
+
+    internal func testSourceSelectionPrefersThePanesOwnTranscript() {
+        let fallback = config.appendingPathComponent("alias")
+        let own = "/c/projects/p/id.jsonl"
+        XCTAssertEqual(
+            TranscriptSource.select(transcriptPath: own, fallbackConfigDir: fallback, folderURL: folder),
+            .file(URL(fileURLWithPath: own))
+        )
+        XCTAssertEqual(
+            TranscriptSource.select(transcriptPath: own, fallbackConfigDir: nil, folderURL: folder),
+            .file(URL(fileURLWithPath: own))
+        )
+        for invalid in [nil, "", "relative/id.jsonl", "/c/projects/p/id.txt"] {
+            XCTAssertEqual(
+                TranscriptSource.select(transcriptPath: invalid, fallbackConfigDir: fallback, folderURL: folder),
+                .latest(folderURL: folder, configDir: fallback),
+                invalid ?? "nil"
+            )
+            XCTAssertNil(TranscriptSource.select(transcriptPath: invalid, fallbackConfigDir: nil, folderURL: folder))
+        }
+    }
+
+    internal func testFileSourceReadsOnlyThatTranscript() throws {
+        let own = transcript.deletingLastPathComponent().appendingPathComponent("own.jsonl")
+        XCTAssertNil(TranscriptSource.file(own).currentTranscript())
+        TestSupport.write(line, to: own)
+        // A newer transcript of another pane in the same folder must not be picked up.
+        TestSupport.write(line + line + line, to: transcript)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(10)],
+            ofItemAtPath: transcript.path
+        )
+        XCTAssertEqual(latest.currentTranscript()?.lastPathComponent, "session.jsonl")
+        var reader = TranscriptUsageReader(source: .file(own))
+        XCTAssertEqual(reader.poll()?.messageCount, 1)
+        XCTAssertNil(reader.poll())
+        XCTAssertEqual(reader.source, .file(own))
     }
 
     deinit {

@@ -100,11 +100,14 @@ internal final class EventCoordinatorPaneTests: XCTestCase {
 
         try handle(.sessionStart, dir: folder.url, paneID: pane.id, claudeSessionID: "conv-1", transcriptPath: path)
         XCTAssertEqual(pane.claudeTranscriptPath, path)
+        // The pane's usage now follows its own conversation.
+        XCTAssertEqual(manager.usageTrackers[pane.id]?.source, .file(URL(fileURLWithPath: path)))
 
         // A new conversation without a path drops the old conversation's path.
         try handle(.sessionStart, dir: folder.url, paneID: pane.id, claudeSessionID: "conv-2")
         XCTAssertEqual(pane.claudeSessionID, "conv-2")
         XCTAssertNil(pane.claudeTranscriptPath)
+        XCTAssertNil(manager.usageTrackers[pane.id], "`ls` has no alias to fall back to")
     }
 
     internal func testInvalidTranscriptPathsAreNotRecorded() throws {

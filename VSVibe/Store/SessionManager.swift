@@ -10,12 +10,15 @@ internal final class SessionManager {
     internal var focusedSessionID: TerminalSession.ID?
 
     @ObservationIgnored private var processDelegates: [TerminalSession.ID: SessionProcessDelegate] = [:]
-    @ObservationIgnored internal private(set) var usageTrackers: [TerminalSession.ID: UsageTracker] = [:]
+    @ObservationIgnored private let usageTracking = PaneUsageTracking()
     @ObservationIgnored private var gitTrackers: [TerminalSession.ID: GitBranchTracker] = [:]
     @ObservationIgnored private var openedAt: [TerminalSession.ID: Date] = [:]
     @ObservationIgnored private let statsStore: StatsStore
     @ObservationIgnored private let aliasStore: LaunchAliasStore
     @ObservationIgnored private let launcher: SessionLauncher
+
+    /// The running usage tracker of each pane that has one.
+    internal var usageTrackers: [TerminalSession.ID: UsageTracker] { usageTracking.trackers }
 
     /// The open panes (in order) and focus, as persisted for restore on launch.
     internal var snapshot: SessionSnapshot {
@@ -65,9 +68,24 @@ internal final class SessionManager {
         transcriptPath: String? = nil
     ) -> TerminalSession {
         let session = makeSession(for: folder, commandOverride: command)
+        recordClaudeConversation(claudeSessionID, transcriptPath: transcriptPath, in: session)
+        return session
+    }
+
+    /// Records the Claude conversation running in `session` (from its hook
+    /// events or a restore) and points the pane's usage tracker at that
+    /// conversation's transcript (or back at the launch alias's latest one
+    /// when the path is unknown). Ignored for usage when the pane is closed.
+    internal func recordClaudeConversation(
+        _ claudeSessionID: String?,
+        transcriptPath: String?,
+        in session: TerminalSession
+    ) {
         session.claudeSessionID = claudeSessionID
         session.claudeTranscriptPath = transcriptPath
-        return session
+        if sessions.contains(where: { $0.id == session.id }) {
+            usageTracking.refresh(session)
+        }
     }
 
     internal func hasSession(forFolder folderID: FolderEntry.ID) -> Bool {
@@ -95,8 +113,7 @@ internal final class SessionManager {
         recordActiveTime(for: session)
         session.terminalView.processDelegate = nil
         terminate(session: session)
-        usageTrackers[id]?.stop()
-        usageTrackers[id] = nil
+        usageTracking.stop(id: id)
         gitTrackers[id]?.stop()
         gitTrackers[id] = nil
         openedAt[id] = nil
@@ -114,10 +131,7 @@ internal final class SessionManager {
             session.terminalView.processDelegate = nil
             terminate(session: session)
         }
-        for tracker in usageTrackers.values {
-            tracker.stop()
-        }
-        usageTrackers.removeAll()
+        usageTracking.stopAll()
         for tracker in gitTrackers.values {
             tracker.stop()
         }
@@ -186,16 +200,10 @@ internal final class SessionManager {
 
     private func startTrackers(for session: TerminalSession, command: String) {
         let folderURL = session.folder.url
-        // Start usage tracker for registered Claude-family aliases.
-        // Match on the base executable so commands carrying flags (e.g.
-        // `claude --continue`) still resolve to their alias.
-        if let alias = aliasStore.alias(for: command), let configDir = alias.claudeConfigDir {
-            let tracker = UsageTracker(folderURL: folderURL, configDir: configDir) { [weak session] usage in
-                session?.usage = usage
-            }
-            usageTrackers[session.id] = tracker
-            tracker.start()
-        }
+        // Until the pane reports its own transcript, track the folder's latest
+        // transcript under the launch command's alias (matched on the base
+        // executable, so `claude --continue` still resolves to `claude`).
+        usageTracking.start(session, fallbackConfigDir: aliasStore.alias(for: command)?.claudeConfigDir)
 
         // Track the folder's git branch for display in the pane chrome.
         let gitTracker = GitBranchTracker(folderURL: folderURL) { [weak session] branch in

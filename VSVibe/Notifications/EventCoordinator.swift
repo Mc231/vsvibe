@@ -121,11 +121,8 @@ internal final class EventCoordinator {
         else {
             return
         }
-        session.claudeSessionID = claudeSessionID
-        session.claudeTranscriptPath = ClaudeTranscriptPath.validated(
-            event.transcriptPath,
-            claudeSessionID: claudeSessionID
-        )
+        let transcriptPath = ClaudeTranscriptPath.validated(event.transcriptPath, claudeSessionID: claudeSessionID)
+        sessionManager.recordClaudeConversation(claudeSessionID, transcriptPath: transcriptPath, in: session)
     }
 
     private func matchSession(forProjectDir projectDir: String) -> TerminalSession? {
