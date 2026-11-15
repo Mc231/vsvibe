@@ -19,7 +19,7 @@ internal final class SessionRestoreController {
 
     private let sessionManager: SessionManager
     private let folderStore: FolderStore
-    private let aliasLookup: (String) -> LaunchAlias?
+    private let lookups: SessionRestorePlan.Lookups
     private let settings: SessionRestoreSettings
     private let fileURL: URL
     private let notificationCenter: NotificationCenter
@@ -32,15 +32,15 @@ internal final class SessionRestoreController {
     internal init(
         sessionManager: SessionManager,
         folderStore: FolderStore,
+        lookups: SessionRestorePlan.Lookups,
         settings: SessionRestoreSettings = SessionRestoreSettings(),
         fileURL: URL = AppPaths.sessionsFile,
         saveDelay: TimeInterval = Constants.saveDelay,
-        notificationCenter: NotificationCenter = .default,
-        aliasLookup: @escaping (String) -> LaunchAlias?
+        notificationCenter: NotificationCenter = .default
     ) {
         self.sessionManager = sessionManager
         self.folderStore = folderStore
-        self.aliasLookup = aliasLookup
+        self.lookups = lookups
         self.settings = settings
         self.fileURL = fileURL
         self.notificationCenter = notificationCenter
@@ -51,6 +51,27 @@ internal final class SessionRestoreController {
     /// real panes and saving would overwrite their `sessions.json`.
     internal static func isUnitTestHost(environment: [String: String]) -> Bool {
         environment[Constants.testConfigurationKey] != nil
+    }
+
+    /// Explains the panes that did not resume the way their project command would.
+    private static func log(_ pane: SessionRestorePlan.Pane) {
+        let folder = pane.folder.url.path
+        switch pane.resolution {
+        case .transcriptMissing:
+            Log.session.info("Not resuming in \(folder, privacy: .public): the conversation's transcript is gone")
+
+        case .resumedWithUnknownConfigDir(let configDir):
+            let dir = configDir?.path ?? "none"
+            Log.session.info(
+                "No alias uses Claude config dir \(dir, privacy: .public); resuming with the project command"
+            )
+
+        case .resumedWithOwningAlias(let command):
+            Log.session.info("Resuming in \(folder, privacy: .public) with alias \(command, privacy: .public)")
+
+        case .launchCommand, .resumedWithProjectCommand:
+            break
+        }
     }
 
     /// Restores the previous panes (when enabled), then starts saving on every
@@ -98,12 +119,14 @@ internal final class SessionRestoreController {
         guard let snapshot = SessionSnapshotFile.read(from: fileURL) else {
             return
         }
-        let plan = SessionRestorePlan.make(snapshot: snapshot, folders: folderStore.folders, aliasLookup: aliasLookup)
+        let plan = SessionRestorePlan.make(snapshot: snapshot, folders: folderStore.folders, lookups: lookups)
         let restored = plan.panes.map { pane in
-            sessionManager.restoreSession(
+            Self.log(pane)
+            return sessionManager.restoreSession(
                 for: pane.folder,
                 command: pane.command,
-                claudeSessionID: pane.claudeSessionID
+                claudeSessionID: pane.claudeSessionID,
+                transcriptPath: pane.transcriptPath
             )
         }
         if let index = plan.focusedIndex {

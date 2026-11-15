@@ -35,8 +35,11 @@ internal enum LaunchCommandResolver {
         aliases.filter(\.supportsClaudeHooks)
     }
 
+    /// The built-in alias a launch command runs, matched on its base command
+    /// like `LaunchAliasStore.alias(for:)` (`"claude --continue"` → `claude`).
     internal static func alias(for command: String) -> LaunchAlias? {
-        aliases.first { $0.command == command }
+        let base = baseCommand(of: command)
+        return aliases.first { $0.command == base }
     }
 
     /// The executable token of a launch command, ignoring any trailing

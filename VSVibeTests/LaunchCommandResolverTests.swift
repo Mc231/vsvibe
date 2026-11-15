@@ -44,6 +44,13 @@ internal final class LaunchCommandResolverTests: XCTestCase {
         XCTAssertEqual(alias?.command, "claude")
     }
 
+    /// Same matching as `LaunchAliasStore.alias(for:)`: on the base command.
+    internal func testAliasLookupMatchesTheBaseCommand() {
+        XCTAssertEqual(LaunchCommandResolver.alias(for: " claude --model opus -c")?.command, "claude")
+        XCTAssertEqual(LaunchCommandResolver.alias(for: "codex --full-auto")?.command, "codex")
+        XCTAssertNil(LaunchCommandResolver.alias(for: "claude-work --continue"))
+    }
+
     internal func testContinueCommandAppendsFlag() {
         XCTAssertEqual(LaunchCommandResolver.continueCommand(for: "claude"), "claude --continue")
         XCTAssertEqual(LaunchCommandResolver.continueCommand(for: "claude-work"), "claude-work --continue")

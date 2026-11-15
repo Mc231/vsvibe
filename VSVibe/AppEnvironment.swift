@@ -40,9 +40,15 @@ internal final class AppEnvironment {
         self.sessionManager = manager
         self.eventCoordinator = EventCoordinator(folderStore: store, sessionManager: manager, statsStore: stats)
         self.diskSpaceMonitor = DiskSpaceMonitor()
-        self.sessionRestore = SessionRestoreController(sessionManager: manager, folderStore: store) { command in
-            aliases.alias(for: command)
-        }
+        self.sessionRestore = SessionRestoreController(
+            sessionManager: manager,
+            folderStore: store,
+            lookups: SessionRestorePlan.Lookups(
+                aliasForCommand: { aliases.alias(for: $0) },
+                aliasForConfigDir: { aliases.alias(forConfigDir: $0) },
+                fileExists: { FileManager.default.fileExists(atPath: $0) }
+            )
+        )
     }
 
     internal func showStats(folder: FolderEntry) {

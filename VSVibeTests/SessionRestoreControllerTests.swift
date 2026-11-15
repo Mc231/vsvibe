@@ -45,16 +45,20 @@ internal final class SessionRestoreControllerTests: XCTestCase {
     // MARK: - Helpers
 
     private func makeController(saveDelay: TimeInterval = 0.05) -> SessionRestoreController {
-        SessionRestoreController(
+        let aliases = LaunchAliasStore(fileURL: directory.appendingPathComponent("aliases.json"))
+        return SessionRestoreController(
             sessionManager: manager,
             folderStore: folderStore,
+            lookups: SessionRestorePlan.Lookups(
+                aliasForCommand: { aliases.alias(for: $0) },
+                aliasForConfigDir: { aliases.alias(forConfigDir: $0) },
+                fileExists: { FileManager.default.fileExists(atPath: $0) }
+            ),
             settings: SessionRestoreSettings(defaults: defaults),
             fileURL: fileURL,
             saveDelay: saveDelay,
             notificationCenter: center
-        ) { command in
-            LaunchCommandResolver.alias(for: LaunchCommandResolver.baseCommand(of: command))
-        }
+        )
     }
 
     private func makeProject(_ name: String, command: String = "claude") -> FolderEntry {
@@ -102,6 +106,38 @@ internal final class SessionRestoreControllerTests: XCTestCase {
         XCTAssertTrue(rewritten)
         XCTAssertEqual(saved()?.panes.map(\.claudeSessionID), ["conv-a", nil, "conv-b"])
         XCTAssertEqual(saved()?.focusedIndex, 1)
+    }
+
+    internal func testRestoreUsesTheConversationsTranscript() throws {
+        let alpha = makeProject("alpha")
+        let workConfig = directory.appendingPathComponent("cfg-work", isDirectory: true)
+        try LaunchAliasStore(fileURL: directory.appendingPathComponent("aliases.json"))
+            .save(command: "work", configPath: workConfig.path)
+        func transcript(_ configDir: URL, _ id: String, create: Bool) throws -> String {
+            let folder = configDir.appendingPathComponent("projects/-alpha", isDirectory: true)
+            let file = folder.appendingPathComponent("\(id).jsonl")
+            if create {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                try Data().write(to: file)
+            }
+            return file.path
+        }
+        let owned = try transcript(workConfig, "conv-w", create: true)
+        let gone = try transcript(directory.appendingPathComponent("cfg-gone"), "conv-m", create: false)
+        let unknown = try transcript(directory.appendingPathComponent("cfg-other"), "conv-u", create: true)
+        SessionSnapshotFile.write(
+            SessionSnapshot(panes: [
+                PaneSnapshot(folderID: alpha.id, claudeSessionID: "conv-w", transcriptPath: owned),
+                PaneSnapshot(folderID: alpha.id, claudeSessionID: "conv-m", transcriptPath: gone),
+                PaneSnapshot(folderID: alpha.id, claudeSessionID: "conv-u", transcriptPath: unknown)
+            ]),
+            to: fileURL
+        )
+
+        makeController().start()
+
+        XCTAssertEqual(manager.sessions.map(\.claudeSessionID), ["conv-w", nil, "conv-u"])
+        XCTAssertEqual(manager.sessions.map(\.claudeTranscriptPath), [owned, nil, unknown])
     }
 
     internal func testStartRunsOnlyOnce() {
