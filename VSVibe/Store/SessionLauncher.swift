@@ -20,8 +20,8 @@ internal struct SessionLauncher {
         makeTerminalView: Self.makeTerminalView,
         spawnShell: Self.spawnShell,
         isOnSearchPath: Self.isOnSearchPath,
-        loginShellCanFind: { command, shell in
-            CommandLocator.loginShellCanFind(command, shell: shell)
+        loginShellAvailability: { command, shell in
+            CommandLocator.loginShellAvailability(command, shell: shell)
         },
         commandDelay: Constants.commandDelay
     )
@@ -33,8 +33,9 @@ internal struct SessionLauncher {
     internal var spawnShell: (LocalProcessTerminalView, URL, UUID) -> Void
     /// Fast PATH probe for a bare executable name.
     internal var isOnSearchPath: (String) -> Bool
-    /// Authoritative (slow) check via the login shell: `(command, shell)`.
-    internal var loginShellCanFind: @Sendable (String, String) -> Bool
+    /// Authoritative (slow, timeout-bounded) check via the interactive login
+    /// shell: `(command, shell)`.
+    internal var loginShellAvailability: @Sendable (String, String) -> CommandAvailability
     /// Seconds to wait before typing the launch command into the new shell.
     internal var commandDelay: TimeInterval
 

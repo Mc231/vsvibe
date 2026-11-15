@@ -81,22 +81,38 @@ internal final class CommandLocatorTests: XCTestCase {
         XCTAssertEqual(resolved, tool.path)
     }
 
-    // MARK: - loginShellCanFind
+    // MARK: - loginShellAvailability
 
-    internal func testLoginShellFindsStandardCommand() {
-        XCTAssertTrue(CommandLocator.loginShellCanFind("ls", shell: "/bin/sh"))
+    internal func testInteractiveLoginShellFindsStandardCommand() {
+        let shell = FakeShell.make(in: makeBinDir())
+        XCTAssertEqual(CommandLocator.loginShellAvailability("ls", shell: shell), .found)
     }
 
-    internal func testLoginShellMissesUnknownCommand() {
-        XCTAssertFalse(CommandLocator.loginShellCanFind("definitely-not-a-real-command-xyz", shell: "/bin/sh"))
+    internal func testInteractiveLoginShellMissesUnknownCommand() {
+        let shell = FakeShell.make(in: makeBinDir())
+        XCTAssertEqual(
+            CommandLocator.loginShellAvailability("definitely-not-a-real-command-xyz", shell: shell),
+            .missing
+        )
     }
 
-    internal func testLoginShellRejectsQuoteInCommand() {
-        XCTAssertFalse(CommandLocator.loginShellCanFind("ls'; echo pwned", shell: "/bin/sh"))
+    internal func testUnsafeCommandNamesAreNeverRun() {
+        // This shell would report `.found` for anything it was asked about.
+        let shell = FakeShell.make(in: makeBinDir(), body: "exit 0")
+        for name in ["ls'; echo pwned", "ls; rm -rf x", "$(id)", "a b", "-n", "..", "", "~/bin/x", "a`b`"] {
+            XCTAssertEqual(CommandLocator.loginShellAvailability(name, shell: shell), .unknown, name)
+        }
     }
 
-    internal func testLoginShellHandlesInvalidShell() {
-        XCTAssertFalse(CommandLocator.loginShellCanFind("ls", shell: "/bin/not-a-shell"))
+    internal func testInvalidShellIsUnknown() {
+        XCTAssertEqual(CommandLocator.loginShellAvailability("ls", shell: "/bin/not-a-shell"), .unknown)
+    }
+
+    internal func testSlowShellTimesOutAsUnknown() {
+        let shell = FakeShell.make(in: makeBinDir(), body: "sleep 10")
+        let start = Date()
+        XCTAssertEqual(CommandLocator.loginShellAvailability("ls", shell: shell, timeout: 0.3), .unknown)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
     }
 
     deinit {

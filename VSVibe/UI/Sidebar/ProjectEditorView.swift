@@ -191,8 +191,10 @@ internal struct ProjectEditorView: View {
     }
 
     /// Live availability check for the entered command. Fast PATH probe first;
-    /// when that misses, confirm via the login shell (off-main, debounced so we
-    /// don't spawn a shell per keystroke). Warning only — never blocks saving.
+    /// when that misses, confirm via the interactive login shell (off-main,
+    /// debounced so we don't spawn a shell per keystroke; aliases from
+    /// `~/.zshrc` count). Warning only — never blocks saving, and a shell that
+    /// times out never warns.
     private func checkCommandAvailability() async {
         let base = LaunchCommandResolver.baseCommand(of: trimmedCommand)
         guard !base.isEmpty else {
@@ -208,14 +210,14 @@ internal struct ProjectEditorView: View {
             return
         }
         let shell = ShellResolver.userLoginShell()
-        let found = await Task.detached(priority: .utility) {
-            CommandLocator.loginShellCanFind(base, shell: shell)
+        let availability = await Task.detached(priority: .utility) {
+            CommandLocator.loginShellAvailability(base, shell: shell)
         }
         .value
         guard !Task.isCancelled else {
             return
         }
-        missingCommand = found ? nil : base
+        missingCommand = availability == .missing ? base : nil
     }
 
     @ViewBuilder

@@ -23,7 +23,7 @@ internal final class SessionLauncherTests: XCTestCase {
         XCTAssertTrue(live.isOnSearchPath("ls"))
         XCTAssertFalse(live.isOnSearchPath("vsvibe-definitely-missing-tool"))
         // An empty command is rejected before any shell is started.
-        XCTAssertFalse(live.loginShellCanFind("", "/bin/sh"))
+        XCTAssertEqual(live.loginShellAvailability("", "/bin/sh"), .unknown)
     }
 
     internal func testMakeTerminalViewIsUnstartedAndUsesAutoLayout() {

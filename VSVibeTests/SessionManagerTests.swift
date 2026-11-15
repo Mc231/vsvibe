@@ -257,11 +257,13 @@ internal final class SessionManagerTests: XCTestCase {
     }
 
     internal func testCommandFoundByLoginShellIsNotFlagged() async {
-        fake = FakeSessionLauncher(loginShellKnows: ["nvm-tool"])
+        fake = FakeSessionLauncher(loginShellKnows: ["nvm-tool"], loginShellTimesOut: ["slow-rc-tool"])
         let manager = makeManager()
         var folder = makeFolder("alpha")
         folder.launchCommand = "nvm-tool"
         let session = manager.createSession(for: folder)
+        folder.launchCommand = "slow-rc-tool"
+        let timedOut = manager.createSession(for: folder)
         let onPathFolder = makeFolder("beta", command: "ls")
         let onPath = manager.createSession(for: onPathFolder)
         let blank = manager.createSession(for: FolderEntry(url: onPathFolder.url, launchCommand: "  "))
@@ -269,6 +271,7 @@ internal final class SessionManagerTests: XCTestCase {
         await AsyncWait.drainMainQueue(seconds: 0.3)
 
         XCTAssertNil(session.errorMessage)
+        XCTAssertNil(timedOut.errorMessage, "A shell that times out must not warn")
         XCTAssertNil(onPath.errorMessage)
         XCTAssertNil(blank.errorMessage)
         manager.closeAllSessions()

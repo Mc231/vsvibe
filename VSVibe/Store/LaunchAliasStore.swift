@@ -37,10 +37,6 @@ internal final class LaunchAliasStore {
         }
     }
 
-    private static let allowedCommandCharacters = CharacterSet(
-        charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
-    )
-
     internal private(set) var customAliases: [LaunchAlias] = []
     internal private(set) var loadError: String?
     @ObservationIgnored private let fileURL: URL
@@ -73,12 +69,7 @@ internal final class LaunchAliasStore {
 
     private static func validate(command: String, configPath: String) throws -> LaunchAlias {
         let name = command.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty,
-            name.unicodeScalars.allSatisfy({ allowedCommandCharacters.contains($0) }),
-            !name.hasPrefix("-"),
-            name != ".",
-            name != ".."
-        else {
+        guard ShellCommandName.isValid(name) else {
             throw AliasError.invalidCommand
         }
         guard !LaunchCommandResolver.knownAliases.contains(name) else {

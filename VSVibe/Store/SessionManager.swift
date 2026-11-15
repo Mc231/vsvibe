@@ -208,16 +208,17 @@ internal final class SessionManager {
     /// Flags the session when the launch command's executable can't be found,
     /// so the pane can explain why nothing is running instead of sitting on a
     /// bare `command not found` shell. Fast PATH probe first; on a miss,
-    /// confirm with the login shell off-main (rc files may add nvm/asdf paths
-    /// the app doesn't inherit).
+    /// confirm with the interactive login shell off-main (rc files may add
+    /// nvm/asdf paths or aliases the app doesn't inherit). Only a definite
+    /// `.missing` warns; a timeout (`.unknown`) stays silent.
     private func verifyLaunchCommand(_ base: String, for session: TerminalSession) {
         guard !base.isEmpty, !launcher.isOnSearchPath(base) else {
             return
         }
         let shell = ShellResolver.userLoginShell()
-        let loginShellCanFind = launcher.loginShellCanFind
+        let loginShellAvailability = launcher.loginShellAvailability
         Task.detached(priority: .utility) {
-            guard !loginShellCanFind(base, shell) else {
+            guard loginShellAvailability(base, shell) == .missing else {
                 return
             }
             await MainActor.run { [weak session] in
