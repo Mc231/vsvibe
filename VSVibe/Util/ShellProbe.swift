@@ -1,4 +1,3 @@
-import Darwin
 import Foundation
 
 /// Runs a short script in the user's shell and reports how it ended. Used to

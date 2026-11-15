@@ -1,5 +1,3 @@
-import Foundation
-
 /// Result of asking the user's shell whether a command exists.
 internal enum CommandAvailability: Equatable, Sendable {
     case found

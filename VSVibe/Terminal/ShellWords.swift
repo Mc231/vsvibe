@@ -1,5 +1,3 @@
-import Foundation
-
 /// Splits shell text into words the way a POSIX shell would, without running
 /// anything: quotes are removed, backslash escapes applied, and unquoted
 /// whitespace, newlines and `;&|()<>` end a word. Used to read alias and
