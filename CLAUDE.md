@@ -41,12 +41,25 @@ root, so new `.swift` files there are picked up on regenerate). Tests live under
   collapsible section per label (see `SidebarGrouping`) followed by an
   "Ungrouped" bucket.
 - `SessionManager` — terminal sessions and their per-session trackers
-  (`UsageTracker`, `GitBranchTracker`); records pane lifecycle into `StatsStore`.
+  (`UsageTracker` via `PaneUsageTracking`, `GitBranchTracker`); records pane
+  lifecycle into `StatsStore`. A pane's usage follows its own transcript
+  (`claudeTranscriptPath` from hooks) once known, before that the folder's
+  latest transcript under the launch command's alias.
 - `EventCoordinator` / `EventWatcher` — Claude hook events (SessionStart / Stop /
   Notification; SessionStart only links a pane to its Claude conversation); records hook activity into `StatsStore`.
 - `StatsStore` — persisted per-project statistics (`stats.json`), per-day
   buckets. Runtime events are recorded on the main actor; Claude usage is scanned
   from transcripts off-main and merged as additive deltas.
+- `LaunchAliasStore` — registered aliases (`aliases.json`) with their Claude
+  config dirs. `CommandLocator` / `ShellAliasResolver` ask the user's
+  **interactive** login shell (`-i -l -c`, `ShellProbe`: 5 s timeout, stdin
+  `/dev/null`) whether a command exists and which `CLAUDE_CONFIG_DIR` a shell
+  alias sets; command names are validated by `ShellCommandName` before going
+  into a script. Unregistered Claude aliases are offered for registration in
+  the project editor and *Aliases & Claude Hooks…* (`ClaudeAccountRegistrar`).
+- `HookPromptController` — on launch (not in the test host) offers to install
+  or update missing/outdated hooks; "Don't ask again" is UserDefaults
+  `hookPromptDismissedScriptVersion` (reset by a new `HookScript.version`).
 - `Git/` — reading the branch from `.git/HEAD` (no subprocess) plus on-demand
   branch listing / switching / stats via `git`.
 - `Stats/`, `Usage/` — stats model + scanner, and live token-usage parsing.

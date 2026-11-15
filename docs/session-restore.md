@@ -136,6 +136,8 @@ sequenceDiagram
    (absolute, no control characters, ending in `/<session_id>.jsonl`), and
    cleared otherwise, so a path never outlives its conversation. A folder-only
    match never sets an id or path (ambiguous with several panes per folder).
+   Both go through `SessionManager.recordClaudeConversation`, which also
+   retargets the pane's token-usage tracker (see "Token usage per pane").
 5. **Event → pane routing** (`EventCoordinator.matchSession`): first the open
    pane whose id equals `paneId`; otherwise the first pane whose folder equals
    `projectDir` (standardised, symlinks resolved), which covers v1 scripts and
@@ -222,6 +224,23 @@ to `sessions.json` again even if Claude has not fired a hook yet in the new
 pane. A later `SessionStart` from `claude --resume` (carrying the new
 `VSVIBE_PANE_ID`) replaces them if Claude reports a different id or path.
 
+## Token usage per pane
+
+The same transcript path drives each pane's token-usage badge
+(`PaneUsageTracking`, `TranscriptSource`, `UsageTracker`):
+
+- Before the pane's first hook event: the most recently modified transcript of
+  the folder under the launch command's alias config dir
+  (`TranscriptSource.latest`); none when the command has no registered alias
+  with a config dir.
+- Once the pane has a `claudeTranscriptPath`: exactly that file
+  (`TranscriptSource.file`), whatever alias or account Claude was started
+  with, so two panes in one folder show their own conversations. A changed path
+  (`/clear`, a new conversation) restarts the tracker and clears the badge
+  until the new transcript has usage; a cleared path falls back to the latest
+  transcript. Restored panes track their transcript immediately.
+- Reading stays incremental (byte offset, bounded chunks) on a detached task.
+
 ## Upgrade step for existing users
 
 Hook script v1 does not emit `paneId`/`sessionId` and does not register
@@ -229,7 +248,12 @@ Hook script v1 does not emit `paneId`/`sessionId` and does not register
 resumed with the project's command, not their owning alias. After upgrading
 VSVibe (including from a build with the v2 script):
 
-1. Open **Aliases & Claude Hooks…** and click **Update Hooks**. The button is
+1. Click **Update Hooks** in the banner VSVibe shows on launch when the hooks
+   are missing or outdated (`HookPromptController`, decision
+   `HookPromptDecision`; **Don't Ask Again** stores the current
+   `HookScript.version` in UserDefaults key `hookPromptDismissedScriptVersion`,
+   so a newer script asks again; never shown in the unit-test host), or open
+   **Aliases & Claude Hooks…** and click **Update Hooks**. The button is
    titled that way when `HookInstaller.Status.needsUpdate` is true: the
    installed script differs from `HookScript.contents`, or an alias has some
    but not all of `installedEvents`. Installing backs up each `settings.json`
@@ -253,7 +277,9 @@ VSVibe (including from a build with the v2 script):
 - The owning alias is found only if it is registered in VSVibe with that
   config dir. A conversation run by an unregistered command (or a shell
   `CLAUDE_CONFIG_DIR` other than an alias's) resumes with the project command,
-  which may fail to find it.
+  which may fail to find it. The project editor and *Aliases & Claude Hooks…*
+  detect shell aliases that set `CLAUDE_CONFIG_DIR` (`ShellAliasResolver`)
+  and offer to register them.
 - When the owning alias differs from the project's command, only the alias's
   bare command is used: the project's extra flags belong to another command
   and are dropped.
@@ -280,6 +306,8 @@ All in `VSVibeTests/`:
 | `sessions.json` read/write/remove, v1 load, newer version rejected | `SessionSnapshotFileTests.swift` |
 | Setting and `sessionsLostOnRelaunch` | `SessionRestoreSettingsTests.swift` |
 | `SessionManager.snapshot` / `restoreSession` | `SessionManagerRestoreTests.swift` |
+| Usage tracker source selection and retargeting | `SessionManagerUsageTests.swift`, `UsageTrackerTests.swift` |
+| Launch hook prompt (decision, Don't Ask Again) | `HookPromptTests.swift` |
 | Pane-id routing, id and transcript-path capture | `EventCoordinatorPaneTests.swift`, `EventCoordinatorTests.swift` |
 | Event decoding (`paneId`, `sessionId`, `transcriptPath`) | `HookEventTests.swift` |
 | Script contents/version, installer, update detection | `HookScriptTests.swift`, `HookInstallerTests.swift`, `HookInstallerUpdateTests.swift` |

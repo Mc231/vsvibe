@@ -10,6 +10,38 @@ is missing.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-15
+
+### Fixed
+
+- Launch commands defined as aliases or functions in `~/.zshrc` (or
+  `~/.bashrc`) are no longer reported as "not installed". VSVibe now asks your
+  interactive shell, and a shell that takes too long to answer never causes a
+  false warning.
+- Token usage is shown per pane: each pane follows its own Claude
+  conversation, so two panes in one project no longer show the same numbers,
+  and a conversation run with another alias or account is counted correctly.
+  The numbers switch to the new conversation after `/clear`.
+
+### Added
+
+- When a project's launch command is a shell alias for another Claude account
+  (`CLAUDE_CONFIG_DIR=…`), the project editor says so and offers **Register**,
+  which adds it as a VSVibe alias and installs its hooks in one click.
+- *Aliases & Claude Hooks…* lists project launch commands that aren't
+  registered yet, with the Claude account each one uses and a **Register**
+  button.
+- On launch, VSVibe offers to install or update the Claude hooks when they are
+  missing or outdated (notifications and session restore need them), with
+  **Not Now** and **Don't Ask Again**.
+
+### Changed
+
+- The hook status flags a registered alias whose Claude config folder doesn't
+  exist yet, or that Claude Code hasn't used yet, and tells you to run that
+  command once and log in. Installing hooks for such an alias creates the
+  folder and its `settings.json`, which Claude Code reads on first run.
+
 ## [0.2.0]
 
 ### Added
