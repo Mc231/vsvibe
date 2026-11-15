@@ -6,6 +6,20 @@
     <description>VSVibe updates</description>
     <language>en</language>
     <item>
+      <title>Version 0.2.1</title>
+      <pubDate>Sun, 15 Nov 2026 11:22:49 GMT</pubDate>
+      <sparkle:version>31</sparkle:version>
+      <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;Fixed&lt;/h3&gt;
+&lt;ul&gt;&lt;li&gt;Launch commands defined as aliases or functions in &lt;code&gt;~/.zshrc&lt;/code&gt; (or &lt;code&gt;~/.bashrc&lt;/code&gt;) are no longer reported as &amp;quot;not installed&amp;quot;. VSVibe now asks your interactive shell, and a shell that takes too long to answer never causes a false warning.&lt;/li&gt;&lt;li&gt;Token usage is shown per pane: each pane follows its own Claude conversation, so two panes in one project no longer show the same numbers, and a conversation run with another alias or account is counted correctly. The numbers switch to the new conversation after &lt;code&gt;/clear&lt;/code&gt;.&lt;/li&gt;&lt;/ul&gt;
+&lt;h3&gt;Added&lt;/h3&gt;
+&lt;ul&gt;&lt;li&gt;When a project&amp;#x27;s launch command is a shell alias for another Claude account (&lt;code&gt;CLAUDE_CONFIG_DIR=…&lt;/code&gt;), the project editor says so and offers &lt;strong&gt;Register&lt;/strong&gt;, which adds it as a VSVibe alias and installs its hooks in one click.&lt;/li&gt;&lt;li&gt;&lt;em&gt;Aliases &amp;amp; Claude Hooks…&lt;/em&gt; lists project launch commands that aren&amp;#x27;t registered yet, with the Claude account each one uses and a &lt;strong&gt;Register&lt;/strong&gt; button.&lt;/li&gt;&lt;li&gt;On launch, VSVibe offers to install or update the Claude hooks when they are missing or outdated (notifications and session restore need them), with &lt;strong&gt;Not Now&lt;/strong&gt; and &lt;strong&gt;Don&amp;#x27;t Ask Again&lt;/strong&gt;.&lt;/li&gt;&lt;/ul&gt;
+&lt;h3&gt;Changed&lt;/h3&gt;
+&lt;ul&gt;&lt;li&gt;The hook status flags a registered alias whose Claude config folder doesn&amp;#x27;t exist yet, or that Claude Code hasn&amp;#x27;t used yet, and tells you to run that command once and log in. Installing hooks for such an alias creates the folder and its &lt;code&gt;settings.json&lt;/code&gt;, which Claude Code reads on first run.&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/Mc231/vsvibe/releases/download/v0.2.1/VSVibe-0.2.1.dmg" length="4664392" type="application/octet-stream" sparkle:edSignature="v+3RNk4gyWUNt1JTEUwgVspwMjz0X73GYuz1+nud21Wo1HSf1kbnJ3W7ZNLnXj5mJlHg1p2yFjbAJrzim5SyBw==" />
+    </item>
+    <item>
       <title>Version 0.2.0</title>
       <pubDate>Sun, 15 Nov 2026 06:11:32 GMT</pubDate>
       <sparkle:version>23</sparkle:version>
