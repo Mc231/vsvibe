@@ -59,7 +59,8 @@ internal final class HookScriptTests: XCTestCase {
 
     internal func testRecordsPaneIDSessionIDAndMessage() throws {
         let paneID = UUID()
-        let payload = #"{"session_id":"abc-123","message":"Allow \"rm\"?\nnow ü","hook_event_name":"Notification"}"#
+        let payload = #"{"session_id":"abc-123","message":"Allow \"rm\"?\nnow ü","hook_event_name":"Notification","#
+            + #""transcript_path":"/Users/u/.claude-work/projects/-a-b/abc-123.jsonl"}"#
 
         let result = try run(
             "Notification",
@@ -73,6 +74,7 @@ internal final class HookScriptTests: XCTestCase {
         XCTAssertEqual(event.event, .notification)
         XCTAssertEqual(event.paneID, paneID)
         XCTAssertEqual(event.claudeSessionID, "abc-123")
+        XCTAssertEqual(event.transcriptPath, "/Users/u/.claude-work/projects/-a-b/abc-123.jsonl")
         XCTAssertEqual(event.message, "Allow \"rm\"?\nnow ü")
         XCTAssertEqual(event.projectDir, "/tmp/a \"b\"/c")
         XCTAssertGreaterThan(event.timestamp, 0)
@@ -87,6 +89,7 @@ internal final class HookScriptTests: XCTestCase {
         XCTAssertEqual(event.event, .sessionStart)
         XCTAssertNil(event.paneID)
         XCTAssertNil(event.claudeSessionID)
+        XCTAssertNil(event.transcriptPath)
         XCTAssertEqual(event.message, "")
     }
 
@@ -98,6 +101,20 @@ internal final class HookScriptTests: XCTestCase {
         XCTAssertEqual(recorded.count, 2)
         XCTAssertEqual(recorded.map(\.event), [.stop, .stop])
         XCTAssertNil(recorded.first?.claudeSessionID)
+        XCTAssertNil(recorded.first?.transcriptPath)
+    }
+
+    internal func testTranscriptPathWithSpecialCharactersRoundTrips() throws {
+        let path = #"/Users/u/My "Claude" ü/projects/-p/s-1.jsonl"#
+        let payload = try JSONSerialization.data(withJSONObject: ["session_id": "s-1", "transcript_path": path])
+
+        let result = try run("SessionStart", stdin: String(bytes: payload, encoding: .utf8) ?? "")
+
+        XCTAssertEqual(result.status, 0)
+        XCTAssertEqual(result.stdout, "")
+        let event = try XCTUnwrap(try events().first)
+        XCTAssertEqual(event.claudeSessionID, "s-1")
+        XCTAssertEqual(event.transcriptPath, path)
     }
 
     deinit {

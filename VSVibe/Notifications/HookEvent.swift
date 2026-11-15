@@ -2,7 +2,7 @@ import Foundation
 
 /// One line of `~/.vsvibe/events.jsonl`, written by the hook script.
 /// Every field is optional on decode, so lines from older scripts (no
-/// `paneId` / `sessionId`) still decode.
+/// `paneId` / `sessionId` / `transcriptPath`) still decode.
 internal struct HookEvent: Codable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case claudeSessionID = "sessionId"
@@ -12,12 +12,14 @@ internal struct HookEvent: Codable, Identifiable {
         case payload = "payload"
         case projectDir = "projectDir"
         case timestamp = "ts"
+        case transcriptPath = "transcriptPath"
     }
 
     /// Subset of the JSON payload Claude passes on stdin to hook commands.
     private enum PayloadKeys: String, CodingKey {
         case message = "message"
         case sessionID = "session_id"
+        case transcriptPath = "transcript_path"
     }
 
     internal let id: UUID
@@ -32,6 +34,9 @@ internal struct HookEvent: Codable, Identifiable {
     internal let paneID: UUID?
     /// Claude's `session_id` (the conversation), nil when unknown.
     internal let claudeSessionID: String?
+    /// Claude's `transcript_path`: the conversation's `.jsonl` file under
+    /// `<config dir>/projects/`. Nil when unknown (hook scripts older than v3).
+    internal let transcriptPath: String?
 
     internal init(
         event: HookEventKind,
@@ -39,7 +44,8 @@ internal struct HookEvent: Codable, Identifiable {
         timestamp: TimeInterval,
         message: String?,
         paneID: UUID? = nil,
-        claudeSessionID: String? = nil
+        claudeSessionID: String? = nil,
+        transcriptPath: String? = nil
     ) {
         self.id = UUID()
         self.event = event
@@ -48,6 +54,7 @@ internal struct HookEvent: Codable, Identifiable {
         self.message = message
         self.paneID = paneID
         self.claudeSessionID = claudeSessionID
+        self.transcriptPath = transcriptPath
     }
 
     internal init(from decoder: Decoder) throws {
@@ -66,6 +73,8 @@ internal struct HookEvent: Codable, Identifiable {
         let topLevelSessionID = Self.nonEmpty(try? container.decode(String.self, forKey: .claudeSessionID))
         self.claudeSessionID = topLevelSessionID
             ?? Self.nonEmpty(try? payload?.decode(String.self, forKey: .sessionID))
+        self.transcriptPath = Self.nonEmpty(try? container.decode(String.self, forKey: .transcriptPath))
+            ?? Self.nonEmpty(try? payload?.decode(String.self, forKey: .transcriptPath))
     }
 
     private static func nonEmpty(_ value: String?) -> String? {
@@ -83,5 +92,6 @@ internal struct HookEvent: Codable, Identifiable {
         try container.encodeIfPresent(message, forKey: .message)
         try container.encodeIfPresent(paneID?.uuidString, forKey: .paneID)
         try container.encodeIfPresent(claudeSessionID, forKey: .claudeSessionID)
+        try container.encodeIfPresent(transcriptPath, forKey: .transcriptPath)
     }
 }

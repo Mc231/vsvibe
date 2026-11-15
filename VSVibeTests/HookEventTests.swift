@@ -78,6 +78,15 @@ internal final class HookEventTests: XCTestCase {
         let legacy = try decode(#"{"event":"Stop","projectDir":"/p","ts":1,"message":"done"}"#)
         XCTAssertNil(legacy.paneID)
         XCTAssertNil(legacy.claudeSessionID)
+        XCTAssertNil(legacy.transcriptPath)
+        XCTAssertNil(try decode(#"{"event":"Stop","transcriptPath":""}"#).transcriptPath)
+    }
+
+    internal func testDecodesTranscriptPathWithPayloadFallback() throws {
+        let event = try decode(#"{"event":"Stop","transcriptPath":"/c/projects/p/s.jsonl"}"#)
+        XCTAssertEqual(event.transcriptPath, "/c/projects/p/s.jsonl")
+        let nested = try decode(#"{"event":"Stop","transcriptPath":"","payload":{"transcript_path":"/x.jsonl"}}"#)
+        XCTAssertEqual(nested.transcriptPath, "/x.jsonl")
     }
 
     internal func testClaudeSessionIDFallsBackToPayload() throws {
@@ -94,11 +103,13 @@ internal final class HookEventTests: XCTestCase {
             timestamp: 1,
             message: nil,
             paneID: pane,
-            claudeSessionID: "s-2"
+            claudeSessionID: "s-2",
+            transcriptPath: "/c/projects/p/s-2.jsonl"
         )
         let decoded = try JSONDecoder().decode(HookEvent.self, from: JSONEncoder().encode(original))
         XCTAssertEqual(decoded.paneID, pane)
         XCTAssertEqual(decoded.claudeSessionID, "s-2")
+        XCTAssertEqual(decoded.transcriptPath, "/c/projects/p/s-2.jsonl")
     }
 
     internal func testKindDisplayNames() {
