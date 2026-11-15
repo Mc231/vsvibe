@@ -12,13 +12,10 @@ internal struct HookSetupView: View {
         static let contentVerticalPadding: CGFloat = 18
         static let footerVerticalPadding: CGFloat = 12
         static let topPadding: CGFloat = 4
-        static let statusIconSize: CGFloat = 16
-        static let statusLabelSize: CGFloat = 12
-        static let statusDetailSize: CGFloat = 11
-        static let statusDetailLineLimit = 2
     }
 
     internal let aliasStore: LaunchAliasStore
+    internal let folderStore: FolderStore
     internal let onClose: () -> Void
 
     @State private var status = HookInstaller.Status(scriptInstalled: false, aliases: [])
@@ -26,6 +23,7 @@ internal struct HookSetupView: View {
     @State private var isError: Bool = false
     @State private var isAliasEditorPresented = false
     @State private var editingAlias: LaunchAlias?
+    @State private var prefilledCommand: String?
 
     internal var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -39,8 +37,16 @@ internal struct HookSetupView: View {
         .onAppear { refreshStatus() }
         .onChange(of: aliasStore.customAliases) { refreshStatus() }
         .sheet(isPresented: $isAliasEditorPresented) {
-            LaunchAliasEditorView(store: aliasStore, alias: editingAlias)
+            LaunchAliasEditorView(store: aliasStore, alias: editingAlias, initialCommand: prefilledCommand)
         }
+    }
+
+    /// Base commands of project launch commands that may be unregistered Claude accounts.
+    private var unregisteredCommands: [String] {
+        UnregisteredClaudeCommand.candidates(
+            forLaunchCommands: folderStore.folders.map(\.launchCommand),
+            aliases: aliasStore.aliases
+        )
     }
 
     private var header: some View {
@@ -65,6 +71,11 @@ internal struct HookSetupView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: Layout.contentSpacing) {
             aliasesSection
+            UnregisteredCommandsSection(commands: unregisteredCommands, register: registerAccount) { command in
+                editingAlias = nil
+                prefilledCommand = command
+                isAliasEditorPresented = true
+            }
             Divider()
             hookStatusSection
 
@@ -97,6 +108,7 @@ internal struct HookSetupView: View {
             Spacer()
             Button("Add Alias…", systemImage: "plus") {
                 editingAlias = nil
+                prefilledCommand = nil
                 isAliasEditorPresented = true
             }
             .disabled(aliasStore.loadError != nil)
@@ -119,7 +131,7 @@ internal struct HookSetupView: View {
 
     @ViewBuilder private var hookStatusSection: some View {
         Text("Hook status").font(.headline)
-        statusBlock(
+        HookStatusRow(
             label: "Hook script",
             detail: status.scriptOutdated
                 ? "Outdated — click Update Hooks: \(HookInstaller.hookScriptURL.path)"
@@ -128,21 +140,21 @@ internal struct HookSetupView: View {
         )
 
         ForEach(status.aliases) { aliasStatus in
-            let path = aliasStatus.alias.settingsURL?.path ?? "(no config)"
-            let displayPath = path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
-            statusBlock(
+            let displayPath = aliasStatus.alias.settingsURL.map { HomePath.abbreviate($0.path) } ?? "(no config)"
+            HookStatusRow(
                 label: "\(aliasStatus.alias.command) — \(displayPath)",
-                detail: aliasStatus.isInstalled
-                    ? "SessionStart + Stop + Notification registered"
-                    : aliasStatus.registeredEvents.isEmpty
-                        ? "Not registered"
-                        : "Partial: \(aliasStatus.registeredEvents.joined(separator: ", "))",
+                detail: aliasStatus.summary,
                 isOK: aliasStatus.isInstalled
             )
+            if let hint = aliasStatus.setupHint() {
+                Label(LocalizedStringKey(hint), systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         }
 
         ForEach(HookInstaller.unsupportedAliases(in: aliasStore.aliases)) { alias in
-            statusBlock(
+            HookStatusRow(
                 label: "\(alias.command) — separate hook system",
                 detail: "Notifications not yet supported for this CLI.",
                 isOK: false,
@@ -190,6 +202,7 @@ internal struct HookSetupView: View {
             Spacer()
             Button("Edit") {
                 editingAlias = alias
+                prefilledCommand = nil
                 isAliasEditorPresented = true
             }
             Button("Remove", role: .destructive) {
@@ -197,32 +210,6 @@ internal struct HookSetupView: View {
                     try aliasStore.remove(command: alias.command)
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private func statusBlock(
-        label: String,
-        detail: String,
-        isOK: Bool,
-        iconOverride: String? = nil,
-        iconColor: Color? = nil
-    ) -> some View {
-        HStack(alignment: .top, spacing: Layout.headerSpacing) {
-            Image(systemName: iconOverride ?? (isOK ? "checkmark.circle.fill" : "xmark.circle.fill"))
-                .foregroundStyle(iconColor ?? (isOK ? Color.green : Color.secondary))
-                .font(.system(size: Layout.statusIconSize))
-                .accessibilityLabel(isOK ? "Installed" : "Not installed")
-            VStack(alignment: .leading, spacing: Layout.titleSpacing) {
-                Text(label).font(.system(size: Layout.statusLabelSize, weight: .semibold))
-                Text(detail)
-                    .font(.system(size: Layout.statusDetailSize, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                    .lineLimit(Layout.statusDetailLineLimit)
-                    .truncationMode(.middle)
-            }
-            Spacer()
         }
     }
 
@@ -235,6 +222,15 @@ internal struct HookSetupView: View {
         } catch {
             lastMessage = "Failed: \(error.localizedDescription)"
             isError = true
+        }
+    }
+
+    private func registerAccount(_ command: UnregisteredClaudeCommand) {
+        guard let configDir = command.configDir else {
+            return
+        }
+        runOperation("Registered \(command.command) and installed its hooks. Restart its running sessions to apply.") {
+            try ClaudeAccountRegistrar.register(command: command.command, configDir: configDir, in: aliasStore)
         }
     }
 

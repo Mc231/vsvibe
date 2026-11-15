@@ -27,7 +27,9 @@ internal struct VSVibeApp: App {
                         set: { env.isHookSetupPresented = $0 }
                     )
                 ) {
-                    HookSetupView(aliasStore: env.aliasStore) { env.isHookSetupPresented = false }
+                    HookSetupView(aliasStore: env.aliasStore, folderStore: env.folderStore) {
+                        env.isHookSetupPresented = false
+                    }
                 }
         }
         .windowStyle(.titleBar)

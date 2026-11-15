@@ -11,6 +11,9 @@ internal enum HookInstaller {
     internal struct AliasStatus: Equatable, Identifiable {
         internal let alias: LaunchAlias
         internal let registeredEvents: [String]
+        /// Whether Claude has used the alias's config dir yet (see
+        /// `ClaudeConfigDirState`); not part of `isInstalled`.
+        internal var configDirState: ClaudeConfigDirState = .ready
 
         internal var id: String { alias.id }
         /// Every event the current installer registers is present.
@@ -94,7 +97,8 @@ internal enum HookInstaller {
             }
             let events = (try? readSettings(at: settingsURL))
                 .flatMap { ($0["hooks"] as? [String: Any]).map(registeredEvents(in:)) } ?? []
-            return AliasStatus(alias: alias, registeredEvents: events)
+            let dirState = alias.claudeConfigDir.map { ClaudeConfigDirState.of($0) } ?? .missing
+            return AliasStatus(alias: alias, registeredEvents: events, configDirState: dirState)
         }
         return Status(
             scriptInstalled: scriptOK,
@@ -120,6 +124,11 @@ internal enum HookInstaller {
         }
     }
 
+    /// Registers the hooks in the alias's `settings.json`. A missing config
+    /// dir is created along with the file: Claude Code reads
+    /// `$CLAUDE_CONFIG_DIR/settings.json`, so the hooks are active from the
+    /// alias's first run (the status still reports it as not set up until
+    /// Claude writes there).
     internal static func installInto(alias: LaunchAlias) throws {
         guard let settingsURL = alias.settingsURL else {
             return

@@ -35,6 +35,7 @@ internal struct SidebarView: View {
         .sheet(item: Binding(get: { env.pendingEditor }, set: { env.pendingEditor = $0 })) { mode in
             ProjectEditorView(
                 mode: mode,
+                aliasStore: env.aliasStore,
                 availableLabels: env.folderStore.labels,
                 availableAliases: env.aliasStore.aliases.map(\.command),
                 onSave: { result in env.commitEditor(mode: mode, result: result) },

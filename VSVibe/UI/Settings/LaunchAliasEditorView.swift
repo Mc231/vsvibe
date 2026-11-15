@@ -9,6 +9,8 @@ internal struct LaunchAliasEditorView: View {
 
     internal let store: LaunchAliasStore
     internal let alias: LaunchAlias?
+    /// Command to prefill when adding (e.g. an unregistered project command).
+    internal var initialCommand: String?
     @Environment(\.dismiss)
     private var dismiss
     @State private var command = ""
@@ -50,7 +52,7 @@ internal struct LaunchAliasEditorView: View {
         .padding(Layout.padding)
         .frame(width: Layout.width)
         .onAppear {
-            command = alias?.command ?? ""
+            command = alias?.command ?? initialCommand ?? ""
             configPath = alias?.claudeConfigDir?.path ?? ""
         }
     }

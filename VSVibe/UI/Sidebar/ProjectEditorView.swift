@@ -21,6 +21,8 @@ internal struct ProjectEditorView: View {
     /// Labels offered for assignment, in sidebar order.
     internal let availableLabels: [ProjectLabel]
     internal let availableAliases: [String]
+    /// Registered aliases; unregistered Claude shell aliases are offered for registration.
+    internal let aliasStore: LaunchAliasStore
     internal let onSave: (ProjectEditorResult) -> Void
     internal let onCancel: () -> Void
 
@@ -136,6 +138,7 @@ internal struct ProjectEditorView: View {
                 .font(.caption)
                 .foregroundStyle(.orange)
             }
+            ClaudeAccountNoticeView(launchCommand: trimmedCommand, aliasStore: aliasStore)
         }
     }
 
@@ -178,6 +181,7 @@ internal struct ProjectEditorView: View {
 
     internal init(
         mode: ProjectEditorMode,
+        aliasStore: LaunchAliasStore,
         availableLabels: [ProjectLabel] = [],
         availableAliases: [String] = LaunchCommandResolver.knownAliases,
         onSave: @escaping (ProjectEditorResult) -> Void,
@@ -186,6 +190,7 @@ internal struct ProjectEditorView: View {
         self.mode = mode
         self.availableLabels = availableLabels
         self.availableAliases = availableAliases
+        self.aliasStore = aliasStore
         self.onSave = onSave
         self.onCancel = onCancel
     }
