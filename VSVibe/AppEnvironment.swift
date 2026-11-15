@@ -11,6 +11,8 @@ internal final class AppEnvironment {
     internal let diskSpaceMonitor: DiskSpaceMonitor
     internal let statsStore: StatsStore
     internal let sessionRestore: SessionRestoreController
+    /// Launch prompt to install / update the Claude hooks.
+    internal let hookPrompt: HookPromptController
     internal var pendingEditor: ProjectEditorMode?
     internal var pendingLabelEditor: LabelEditorMode?
     internal var isManageLabelsPresented: Bool = false
@@ -49,6 +51,10 @@ internal final class AppEnvironment {
                 fileExists: { FileManager.default.fileExists(atPath: $0) }
             )
         )
+        self.hookPrompt = HookPromptController(
+            status: { HookInstaller.currentStatus(aliases: aliases.aliases) },
+            install: { try HookInstaller.install(aliases: aliases.aliases) }
+        )
     }
 
     internal func showStats(folder: FolderEntry) {
@@ -62,9 +68,10 @@ internal final class AppEnvironment {
     internal func startEventStream() {
         eventCoordinator.start()
         diskSpaceMonitor.start()
-        // Never touch the user's panes or sessions.json from the unit-test host.
+        // Never touch the user's panes or sessions.json, or prompt, from the unit-test host.
         if !SessionRestoreController.isUnitTestHost(environment: ProcessInfo.processInfo.environment) {
             sessionRestore.start()
+            hookPrompt.evaluateOnLaunch()
         }
     }
 

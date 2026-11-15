@@ -21,6 +21,11 @@ internal struct RootSplitView: View {
                 )
         } detail: {
             GridContainerView()
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if env.hookPrompt.isVisible {
+                        HookPromptBanner(controller: env.hookPrompt)
+                    }
+                }
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar {
