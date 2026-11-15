@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>VSVibe</title>
+    <link>https://mc231.github.io/vsvibe/appcast.xml</link>
+    <description>VSVibe updates</description>
+    <language>en</language>
+    <item>
+      <title>Version 0.2.0</title>
+      <pubDate>Sun, 15 Nov 2026 06:11:32 GMT</pubDate>
+      <sparkle:version>23</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;Added&lt;/h3&gt;
+&lt;ul&gt;&lt;li&gt;&lt;strong&gt;Automatic updates&lt;/strong&gt; (Sparkle 2): VSVibe checks for new versions in the background, shows the release notes and offers Install Update, Remind Me Later or Skip This Version. &amp;quot;Check for Updates…&amp;quot; is in the app menu, and the new Settings window has an Updates tab to turn automatic checks and automatic downloads on or off.&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Session restore&lt;/strong&gt;: open panes come back after the app relaunches (on by default, can be turned off in Settings). When it is off, installing an update asks before closing running sessions. Each Claude pane resumes its own conversation with the alias (Claude config dir / account) that ran it; click &lt;strong&gt;Update Hooks&lt;/strong&gt; in &lt;em&gt;Aliases &amp;amp; Claude Hooks…&lt;/em&gt; once after updating.&lt;/li&gt;&lt;li&gt;Developer ID signed, notarized release DMGs published on GitHub Releases.&lt;/li&gt;&lt;/ul&gt;
+&lt;h3&gt;Changed&lt;/h3&gt;
+&lt;ul&gt;&lt;li&gt;Strict quality gates: every SwiftLint rule, compiler warnings as errors, at least 90% unit-test coverage of the core logic, unused-code checks (Periphery) and a SonarQube quality gate, all enforced in CI.&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/Mc231/vsvibe/releases/download/v0.2.0/VSVibe-0.2.0.dmg" length="4563135" type="application/octet-stream" sparkle:edSignature="Pmw8rOpIvLU+eQvbMFN5iJEninJuQlhtck/LAI5/O1/o+93alPbf+zWvekf24bMHAKnxr1iBzfWeZrgoNdNTBw==" />
+    </item>
+  </channel>
+</rss>
