@@ -98,7 +98,7 @@ internal final class LaunchAliasStore {
 
     /// Expands a leading `~` (current user) or `~user` like
     /// `NSString.expandingTildeInPath`; unknown users leave the path unchanged.
-    internal static func expandingTilde(in path: String) -> String {
+    nonisolated internal static func expandingTilde(in path: String) -> String {
         guard path.hasPrefix("~") else {
             return path
         }
@@ -117,6 +117,16 @@ internal final class LaunchAliasStore {
     internal func alias(for command: String) -> LaunchAlias? {
         let base = LaunchCommandResolver.baseCommand(of: command)
         return aliases.first { $0.command == base }
+    }
+
+    /// The first alias whose Claude config dir is `configDir`, comparing
+    /// canonical paths (`~` expanded, standardized, symlinks resolved). The
+    /// built-in `claude` alias owns `~/.claude`.
+    internal func alias(forConfigDir configDir: URL) -> LaunchAlias? {
+        let target = ClaudeTranscriptPath.canonical(configDir.path)
+        return aliases.first { alias in
+            alias.claudeConfigDir.map { ClaudeTranscriptPath.canonical($0.path) == target } ?? false
+        }
     }
 
     /// Persist first so a failed write never looks like a successful edit.

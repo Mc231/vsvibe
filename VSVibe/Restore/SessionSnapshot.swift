@@ -2,7 +2,9 @@
 /// can be reopened on the next launch.
 internal struct SessionSnapshot: Codable, Equatable {
     /// v1: `panes` + `focusedIndex`.
-    internal static let currentVersion = 1
+    /// v2: adds `panes[].transcriptPath` (v1 files still load without it).
+    /// Files with a newer version are not restored (`SessionSnapshotFile.read`).
+    internal static let currentVersion = 2
 
     internal var version: Int
     /// Panes in display order (the tiling layout is derived from this order).

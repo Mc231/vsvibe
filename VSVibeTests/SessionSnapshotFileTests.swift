@@ -18,13 +18,34 @@ internal final class SessionSnapshotFileTests: XCTestCase {
     internal func testWriteThenReadRoundTrips() {
         let snapshot = SessionSnapshot(
             panes: [
-                PaneSnapshot(folderID: UUID(), claudeSessionID: "conv"),
+                PaneSnapshot(folderID: UUID(), claudeSessionID: "conv", transcriptPath: "/c/projects/p/conv.jsonl"),
                 PaneSnapshot(folderID: UUID(), claudeSessionID: nil)
             ],
             focusedIndex: 1
         )
         SessionSnapshotFile.write(snapshot, to: fileURL)
         XCTAssertEqual(SessionSnapshotFile.read(from: fileURL), snapshot)
+        XCTAssertEqual(SessionSnapshotFile.read(from: fileURL)?.version, 2)
+    }
+
+    internal func testVersionOneFileLoadsWithoutTranscriptPaths() throws {
+        let folderID = UUID()
+        let pane = #"{"folderID":"\#(folderID.uuidString)","claudeSessionID":"c"}"#
+        try Data(#"{"version":1,"focusedIndex":0,"panes":[\#(pane)]}"#.utf8).write(to: fileURL)
+        let snapshot = try XCTUnwrap(SessionSnapshotFile.read(from: fileURL))
+        XCTAssertEqual(snapshot.version, 1)
+        XCTAssertEqual(snapshot.panes, [PaneSnapshot(folderID: folderID, claudeSessionID: "c", transcriptPath: nil)])
+        XCTAssertEqual(snapshot.focusedIndex, 0)
+    }
+
+    internal func testNewerVersionIsNotRestored() throws {
+        let newer = SessionSnapshot.currentVersion + 1
+        let json = #"{"version":\#(newer),"panes":[{"folderID":"\#(UUID().uuidString)"}]}"#
+        try Data(json.utf8).write(to: fileURL)
+        XCTAssertNil(SessionSnapshotFile.read(from: fileURL))
+
+        try Data(#"{"panes":[]}"#.utf8).write(to: fileURL)
+        XCTAssertNil(SessionSnapshotFile.read(from: fileURL), "a file without a version is not trusted")
     }
 
     internal func testMissingOrCorruptFileReadsAsNil() throws {

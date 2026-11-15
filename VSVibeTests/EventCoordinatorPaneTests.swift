@@ -47,7 +47,8 @@ internal final class EventCoordinatorPaneTests: XCTestCase {
         _ kind: HookEventKind,
         dir: URL,
         paneID: UUID? = nil,
-        claudeSessionID: String? = nil
+        claudeSessionID: String? = nil,
+        transcriptPath: String? = nil
     ) throws {
         let event = HookEvent(
             event: kind,
@@ -55,7 +56,8 @@ internal final class EventCoordinatorPaneTests: XCTestCase {
             timestamp: 1,
             message: nil,
             paneID: paneID,
-            claudeSessionID: claudeSessionID
+            claudeSessionID: claudeSessionID,
+            transcriptPath: transcriptPath
         )
         try XCTUnwrap(coordinator).handle(event)
     }
@@ -89,6 +91,41 @@ internal final class EventCoordinatorPaneTests: XCTestCase {
         try handle(.sessionStart, dir: folder.url, paneID: pane.id, claudeSessionID: "after-clear")
 
         XCTAssertEqual(pane.claudeSessionID, "after-clear")
+    }
+
+    internal func testRecordsAValidTranscriptPathWithTheID() throws {
+        let folder = makeProject("alpha")
+        let pane = manager.createSession(for: folder)
+        let path = "/Users/u/.claude-work/projects/-alpha/conv-1.jsonl"
+
+        try handle(.sessionStart, dir: folder.url, paneID: pane.id, claudeSessionID: "conv-1", transcriptPath: path)
+        XCTAssertEqual(pane.claudeTranscriptPath, path)
+
+        // A new conversation without a path drops the old conversation's path.
+        try handle(.sessionStart, dir: folder.url, paneID: pane.id, claudeSessionID: "conv-2")
+        XCTAssertEqual(pane.claudeSessionID, "conv-2")
+        XCTAssertNil(pane.claudeTranscriptPath)
+    }
+
+    internal func testInvalidTranscriptPathsAreNotRecorded() throws {
+        let folder = makeProject("alpha")
+        let pane = manager.createSession(for: folder)
+        let invalid = [
+            "relative/projects/p/conv-1.jsonl",
+            "/c/projects/p/other-id.jsonl",
+            "/c/projects/p/conv-1.json",
+            "/c/projects/p\n/conv-1.jsonl"
+        ]
+
+        for path in invalid {
+            try handle(.stop, dir: folder.url, paneID: pane.id, claudeSessionID: "conv-1", transcriptPath: path)
+            XCTAssertEqual(pane.claudeSessionID, "conv-1")
+            XCTAssertNil(pane.claudeTranscriptPath, path)
+        }
+
+        // Another pane's event never sets this pane's path.
+        try handle(.stop, dir: folder.url, claudeSessionID: "conv-9", transcriptPath: "/c/projects/p/conv-9.jsonl")
+        XCTAssertNil(pane.claudeTranscriptPath)
     }
 
     internal func testSessionStartOnlyRecordsTheID() throws {

@@ -20,7 +20,13 @@ internal final class SessionManager {
     /// The open panes (in order) and focus, as persisted for restore on launch.
     internal var snapshot: SessionSnapshot {
         SessionSnapshot(
-            panes: sessions.map { PaneSnapshot(folderID: $0.folder.id, claudeSessionID: $0.claudeSessionID) },
+            panes: sessions.map { session in
+                PaneSnapshot(
+                    folderID: session.folder.id,
+                    claudeSessionID: session.claudeSessionID,
+                    transcriptPath: session.claudeTranscriptPath
+                )
+            },
             focusedIndex: focusedSessionID.flatMap { id in sessions.firstIndex { $0.id == id } }
         )
     }
@@ -49,16 +55,18 @@ internal final class SessionManager {
 
     /// Opens a pane restored from a previous launch: `command` is typed instead
     /// of the folder's launch command (e.g. `claude --resume <id>`) and the
-    /// Claude conversation id is carried over, so a later relaunch resumes it
-    /// again. Focus is left to the caller.
+    /// Claude conversation id and transcript path are carried over, so a later
+    /// relaunch resumes it again. Focus is left to the caller.
     @discardableResult
     internal func restoreSession(
         for folder: FolderEntry,
         command: String,
-        claudeSessionID: String?
+        claudeSessionID: String?,
+        transcriptPath: String? = nil
     ) -> TerminalSession {
         let session = makeSession(for: folder, commandOverride: command)
         session.claudeSessionID = claudeSessionID
+        session.claudeTranscriptPath = transcriptPath
         return session
     }
 

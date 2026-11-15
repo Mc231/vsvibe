@@ -109,8 +109,11 @@ internal final class EventCoordinator {
         return matchSession(forProjectDir: event.projectDir)
     }
 
-    /// Keeps the latest Claude session id of a pane. Only events carrying the
-    /// pane's own id count: a folder match is ambiguous with several panes.
+    /// Keeps the latest Claude session id of a pane, with its transcript path
+    /// when the event carries a valid one for that id (else the path is
+    /// cleared: it would belong to an older conversation). Only events
+    /// carrying the pane's own id count: a folder match is ambiguous with
+    /// several panes.
     private func recordClaudeSessionID(of event: HookEvent, in session: TerminalSession) {
         guard event.paneID == session.id,
             let claudeSessionID = event.claudeSessionID,
@@ -119,6 +122,10 @@ internal final class EventCoordinator {
             return
         }
         session.claudeSessionID = claudeSessionID
+        session.claudeTranscriptPath = ClaudeTranscriptPath.validated(
+            event.transcriptPath,
+            claudeSessionID: claudeSessionID
+        )
     }
 
     private func matchSession(forProjectDir projectDir: String) -> TerminalSession? {

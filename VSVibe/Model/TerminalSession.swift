@@ -26,6 +26,9 @@ internal final class TerminalSession: Identifiable {
     /// `/clear`), or carried over when the pane was restored. Persisted so the
     /// next launch can `--resume` it.
     internal var claudeSessionID: String?
+    /// Claude's `transcript_path` for `claudeSessionID` (set and cleared with
+    /// it): which config dir, and so which alias, owns the conversation.
+    internal var claudeTranscriptPath: String?
 
     // Token usage from the latest Claude transcript for this folder.
     internal var usage: SessionUsage?

@@ -49,6 +49,7 @@ internal final class SessionManagerRestoreTests: XCTestCase {
         manager.createSession(for: beta)
         manager.createSession(for: alpha)
         first.claudeSessionID = "conv-1"
+        first.claudeTranscriptPath = "/c/projects/p/conv-1.jsonl"
         manager.focus(id: first.id)
 
         let snapshot = manager.snapshot
@@ -56,6 +57,7 @@ internal final class SessionManagerRestoreTests: XCTestCase {
         XCTAssertEqual(snapshot.version, SessionSnapshot.currentVersion)
         XCTAssertEqual(snapshot.panes.map(\.folderID), [alpha.id, beta.id, alpha.id])
         XCTAssertEqual(snapshot.panes.map(\.claudeSessionID), ["conv-1", nil, nil])
+        XCTAssertEqual(snapshot.panes.map(\.transcriptPath), ["/c/projects/p/conv-1.jsonl", nil, nil])
         XCTAssertEqual(snapshot.focusedIndex, 0)
 
         manager.closeAllSessions()
@@ -66,9 +68,15 @@ internal final class SessionManagerRestoreTests: XCTestCase {
         let manager = makeManager()
         let folder = makeFolder("alpha")
 
-        let session = manager.restoreSession(for: folder, command: "claude --resume conv-1", claudeSessionID: "conv-1")
+        let session = manager.restoreSession(
+            for: folder,
+            command: "claude --resume conv-1",
+            claudeSessionID: "conv-1",
+            transcriptPath: "/c/projects/p/conv-1.jsonl"
+        )
 
         XCTAssertEqual(session.claudeSessionID, "conv-1")
+        XCTAssertEqual(session.claudeTranscriptPath, "/c/projects/p/conv-1.jsonl")
         XCTAssertEqual(manager.sessions.map(\.id), [session.id])
         XCTAssertEqual(fake.spawnedFolders, [folder.url])
         XCTAssertNil(session.errorMessage, "the command's base executable is verified, not the whole line")
