@@ -131,7 +131,9 @@ GitHub Release assets. `MARKETING_VERSION` comes from the tag and
 `CURRENT_PROJECT_VERSION` is `git rev-list --count HEAD`; project.yml only holds
 local defaults.
 
-**To release:** add a `## [X.Y.Z]` section to `CHANGELOG.md` (required), commit,
+**To release:** follow the project skill **`/release`**
+(`.claude/skills/release/SKILL.md`: version choice, local gates, CI wait, tag,
+verification, failure table). In short: add a `## [X.Y.Z]` section to `CHANGELOG.md` (required), commit,
 push `main` and the tag `vX.Y.Z` to GitHub. `release.yml` tests, signs with
 Developer ID from a temporary keychain, notarizes with the App Store Connect API
 key, staples, signs the DMG for Sparkle, creates the GitHub Release and updates
