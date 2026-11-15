@@ -37,8 +37,8 @@ internal final class ClaudeAccountRegistrationTests: XCTestCase {
         XCTAssertNil(UnregisteredClaudeCommand.candidate(forLaunchCommand: "~/bin/claude", aliases: aliases))
         XCTAssertNil(UnregisteredClaudeCommand.candidate(forLaunchCommand: "X=1 claude", aliases: aliases))
         XCTAssertEqual(
-            UnregisteredClaudeCommand.candidate(forLaunchCommand: " claudeimpressit -c", aliases: aliases),
-            "claudeimpressit"
+            UnregisteredClaudeCommand.candidate(forLaunchCommand: " claudework -c", aliases: aliases),
+            "claudework"
         )
         XCTAssertEqual(
             UnregisteredClaudeCommand.candidates(
@@ -66,18 +66,18 @@ internal final class ClaudeAccountRegistrationTests: XCTestCase {
 
     internal func testRegisterSavesAliasAndInstallsHooksIntoMissingConfigDir() throws {
         let store = makeStore()
-        let configDir = directory.appendingPathComponent("claude-impressit-2", isDirectory: true)
+        let configDir = directory.appendingPathComponent("claude-work-2", isDirectory: true)
         XCTAssertEqual(ClaudeConfigDirState.of(configDir), .missing)
 
         let alias = try ClaudeAccountRegistrar.register(
-            command: "claudeimpressit",
+            command: "claudework",
             configDir: configDir,
             in: store,
             scriptURL: scriptURL
         )
 
-        XCTAssertEqual(alias.command, "claudeimpressit")
-        XCTAssertEqual(store.alias(for: "claudeimpressit --continue"), alias)
+        XCTAssertEqual(alias.command, "claudework")
+        XCTAssertEqual(store.alias(for: "claudework --continue"), alias)
         XCTAssertTrue(HookInstaller.isScriptCurrent(at: scriptURL))
         // The dir and settings.json are created; Claude Code reads that file on first run.
         let settings = try XCTUnwrap(alias.settingsURL)

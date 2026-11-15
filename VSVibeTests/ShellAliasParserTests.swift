@@ -53,8 +53,8 @@ internal final class ShellAliasParserTests: XCTestCase {
     // MARK: - CLAUDE_CONFIG_DIR
 
     internal func testZshAliasWithHomeVariable() {
-        let zsh = "cw='CLAUDE_CONFIG_DIR=\"$HOME/.claude-impressit-2\" /Users/me/.local/bin/claude'"
-        XCTAssertEqual(configDir(zsh), "/Users/me/.claude-impressit-2")
+        let zsh = "cw='CLAUDE_CONFIG_DIR=\"$HOME/.claude-work-2\" /Users/me/.local/bin/claude'"
+        XCTAssertEqual(configDir(zsh), "/Users/me/.claude-work-2")
     }
 
     internal func testBashAliasLine() {
