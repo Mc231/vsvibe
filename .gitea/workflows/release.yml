@@ -184,12 +184,17 @@ jobs:
         run: |
           set -euo pipefail
           tag="$GITHUB_REF_NAME"
+          # Same DMG under a stable name, so the website can always link
+          # https://github.com/<repo>/releases/latest/download/VSVibe.dmg
+          stable="$RUNNER_TEMP/stable/VSVibe.dmg"
+          mkdir -p "$(dirname "$stable")"
+          cp "$DMG" "$stable"
           if gh release view "$tag" --repo "$GITHUB_REPO" > /dev/null 2>&1; then
-            # Re-run of the same tag: replace the asset, refresh the notes.
-            gh release upload "$tag" "$DMG" --repo "$GITHUB_REPO" --clobber
+            # Re-run of the same tag: replace the assets, refresh the notes.
+            gh release upload "$tag" "$DMG" "$stable" --repo "$GITHUB_REPO" --clobber
             gh release edit "$tag" --repo "$GITHUB_REPO" --notes-file "$RUNNER_TEMP/release-notes.md"
           else
-            gh release create "$tag" "$DMG" \
+            gh release create "$tag" "$DMG" "$stable" \
               --repo "$GITHUB_REPO" \
               --verify-tag \
               --title "VSVibe $VERSION" \

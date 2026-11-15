@@ -119,8 +119,11 @@ flowchart TD
    and the signature is verified before use.
 7. **Artifact.** The DMG is also uploaded as a Gitea artifact (90 days).
 8. **GitHub Release** (`gh`, `GH_RELEASE_TOKEN`): created with
-   `--verify-tag`, title `VSVibe X.Y.Z`, CHANGELOG section as notes. A re-run
-   of the same tag replaces the asset and notes.
+   `--verify-tag`, title `VSVibe X.Y.Z`, CHANGELOG section as notes. Two
+   assets: `VSVibe-X.Y.Z.dmg` (used by the appcast) and the same file as
+   `VSVibe.dmg`, so `https://github.com/Mc231/vsvibe/releases/latest/download/VSVibe.dmg`
+   always downloads the newest version (the website's Download button). A
+   re-run of the same tag replaces the assets and notes.
 9. **Appcast.** Shallow-clones `gh-pages` (or creates it as an orphan branch),
    runs `tools/appcast.py update` (one `<item>`: `sparkle:version` = build,
    `sparkle:shortVersionString` = version, `minimumSystemVersion` 15.0, notes as

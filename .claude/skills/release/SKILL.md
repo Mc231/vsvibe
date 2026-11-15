@@ -127,6 +127,10 @@ for the version before pushing the tag.** A published version is final.
    hdiutil detach -quiet "$M"
    ```
 
+   Also check the stable link the website uses resolves to this version:
+   `curl -sIL -o /dev/null -w '%{http_code}\n' https://github.com/Mc231/vsvibe/releases/latest/download/VSVibe.dmg`
+   (200; the release must have both `VSVibe-X.Y.Z.dmg` and `VSVibe.dmg`).
+
    Expected: `source=Notarized Developer ID`, stapler OK, version `X.Y.Z`, build
    = commit count, and the appcast's newest item matches. GitHub Pages can take
    a minute or two to serve the new appcast.
