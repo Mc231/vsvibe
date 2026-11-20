@@ -6,6 +6,16 @@
     <description>VSVibe updates</description>
     <language>en</language>
     <item>
+      <title>Version 0.3.0</title>
+      <pubDate>Fri, 20 Nov 2026 08:36:46 GMT</pubDate>
+      <sparkle:version>37</sparkle:version>
+      <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;Added&lt;/h3&gt;
+&lt;ul&gt;&lt;li&gt;Remote (SSH) projects: &lt;em&gt;File → New Remote Project…&lt;/em&gt; (or the network button in the sidebar) adds a project that lives on another machine. Its panes &lt;code&gt;ssh&lt;/code&gt; to the host, change to the remote folder and run Claude, an alias such as &lt;code&gt;claudework&lt;/code&gt;, any other command or just a shell there. Claude panes resume their own conversation when VSVibe restores them, without hooks.&lt;/li&gt;&lt;li&gt;Remote panes are as informative as local ones: &amp;quot;needs input&amp;quot; / &amp;quot;finished&amp;quot; notifications, token usage and the git branch now come from the remote host over ssh. Install or update the Claude hooks on the host from the project editor (&lt;em&gt;Install Hooks on &amp;lt;host&amp;gt;&lt;/em&gt;, with a status line); they go into the Claude config dir of the project&amp;#x27;s command, including a remote &lt;code&gt;CLAUDE_CONFIG_DIR&lt;/code&gt; alias, and keep your other hooks. Needs ssh to log in without a prompt (keys or agent) and bash on the host.&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/Mc231/vsvibe/releases/download/v0.3.0/VSVibe-0.3.0.dmg" length="4886815" type="application/octet-stream" sparkle:edSignature="YIS8e4iSZzE41vMJ87hsFn6ME2egQC1dFCD2wmjzv52JrmY5oM5MSvnr1T5Qats8DR3bHxhiFNe9lKK+3tc6Cw==" />
+    </item>
+    <item>
       <title>Version 0.2.1</title>
       <pubDate>Sun, 15 Nov 2026 11:22:49 GMT</pubDate>
       <sparkle:version>31</sparkle:version>
