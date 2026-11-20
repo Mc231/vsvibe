@@ -10,6 +10,8 @@ is missing.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-20
+
 ### Added
 
 - Remote (SSH) projects: *File → New Remote Project…* (or the network button
