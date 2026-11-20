@@ -16,9 +16,14 @@ is missing.
   in the sidebar) adds a project that lives on another machine. Its panes `ssh`
   to the host, change to the remote folder and run Claude, an alias such as
   `claudework`, any other command or just a shell there. Claude panes resume
-  their own conversation when VSVibe restores them, without hooks. Hook
-  notifications, token usage and the git branch are not shown for remote panes
-  yet.
+  their own conversation when VSVibe restores them, without hooks.
+- Remote panes are as informative as local ones: "needs input" / "finished"
+  notifications, token usage and the git branch now come from the remote host
+  over ssh. Install or update the Claude hooks on the host from the project
+  editor (*Install Hooks on <host>*, with a status line); they go into the
+  Claude config dir of the project's command, including a remote
+  `CLAUDE_CONFIG_DIR` alias, and keep your other hooks. Needs ssh to log in
+  without a prompt (keys or agent) and bash on the host.
 
 ## [0.2.1] - 2026-11-15
 

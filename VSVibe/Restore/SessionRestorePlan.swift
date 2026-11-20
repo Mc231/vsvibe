@@ -156,7 +156,8 @@ internal struct SessionRestorePlan: Equatable {
     /// A remote pane's command is the remote command; it resumes the saved
     /// conversation (`RemoteLaunch`: `--resume`, else start it with that id)
     /// when the project runs Claude and the id is valid. The transcript is on
-    /// the remote host, so its path is neither checked nor carried.
+    /// the remote host, so its path is not checked; a valid one is carried so
+    /// the pane's remote usage shows right away.
     private static func remotePane(for folder: FolderEntry, remote: RemoteTarget, saved: PaneSnapshot) -> Pane {
         guard remote.launchesClaude,
             let sessionID = saved.claudeSessionID,
@@ -168,7 +169,7 @@ internal struct SessionRestorePlan: Equatable {
             folder: folder,
             command: remote.command,
             claudeSessionID: sessionID,
-            transcriptPath: nil,
+            transcriptPath: ClaudeTranscriptPath.validated(saved.transcriptPath, claudeSessionID: sessionID),
             resolution: .resumedRemote
         )
     }

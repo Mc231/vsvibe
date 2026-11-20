@@ -30,6 +30,7 @@ internal struct ProjectEditorView: View {
     @State private var openImmediately: Bool = true
     @State private var missingCommand: String?
     @State private var selectedLabelIDs: [ProjectLabel.ID] = []
+    @State private var hookSetup: RemoteHookSetupModel
 
     internal var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -90,7 +91,11 @@ internal struct ProjectEditorView: View {
             }
 
             if draft.isRemote {
-                RemoteProjectFields(form: $draft.remote)
+                RemoteProjectFields(
+                    form: $draft.remote,
+                    hookSetup: hookSetup,
+                    checksHooksAutomatically: !mode.isCreate
+                )
             } else {
                 localFields
             }
@@ -193,12 +198,14 @@ internal struct ProjectEditorView: View {
     internal init(
         mode: ProjectEditorMode,
         aliasStore: LaunchAliasStore,
+        remoteHookInstaller: RemoteHookInstaller,
         availableLabels: [ProjectLabel] = [],
         availableAliases: [String] = LaunchCommandResolver.knownAliases,
         onSave: @escaping (ProjectEditorResult) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.mode = mode
+        _hookSetup = State(initialValue: RemoteHookSetupModel(installer: remoteHookInstaller))
         self.availableLabels = availableLabels
         self.availableAliases = availableAliases
         self.aliasStore = aliasStore

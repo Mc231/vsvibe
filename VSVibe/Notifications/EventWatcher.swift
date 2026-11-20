@@ -6,14 +6,13 @@ import Foundation
 internal final class EventWatcher {
     private enum Constants {
         static let defaultPollInterval: TimeInterval = 0.5
-        static let newline: UInt8 = 0x0A
     }
 
     private let url: URL
     private let pollInterval: TimeInterval
     private var timer: DispatchSourceTimer?
     private var offset: UInt64 = 0
-    private var partialLine = Data()
+    private var lines = LineSplitter()
     private let onEvent: (HookEvent) -> Void
 
     /// Whether the poll timer is running.
@@ -57,7 +56,7 @@ internal final class EventWatcher {
         if size < offset {
             // File was truncated or rotated — reset.
             offset = 0
-            partialLine.removeAll()
+            lines.reset()
         }
         guard size > offset else {
             return
@@ -74,17 +73,11 @@ internal final class EventWatcher {
         let chunk = handle.availableData
         offset += UInt64(chunk.count)
 
-        var buffer = partialLine + chunk
-        partialLine.removeAll()
-
-        while let newlineIndex = buffer.firstIndex(of: Constants.newline) {
-            let lineData = buffer.subdata(in: buffer.startIndex..<newlineIndex)
-            buffer.removeSubrange(buffer.startIndex...newlineIndex)
-            if let event = parseLine(lineData) {
+        for line in lines.append(chunk) {
+            if let event = HookEvent.decoded(fromLine: line) {
                 onEvent(event)
             }
         }
-        partialLine = buffer
     }
 
     private func ensureFileExists() {
@@ -99,20 +92,6 @@ internal final class EventWatcher {
     private func currentSize() -> UInt64 {
         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
         return (attrs?[.size] as? UInt64) ?? 0
-    }
-
-    private func parseLine(_ data: Data) -> HookEvent? {
-        guard !data.isEmpty else {
-            return nil
-        }
-        do {
-            return try JSONDecoder().decode(HookEvent.self, from: data)
-        } catch {
-            let text = String(bytes: data, encoding: .utf8) ?? "<binary>"
-            let detail = "failed to parse line: \(text) error=\(String(describing: error))"
-            Log.app.error("EventWatcher: \(detail, privacy: .public)")
-            return nil
-        }
     }
 
     deinit {

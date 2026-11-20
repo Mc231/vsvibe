@@ -63,7 +63,9 @@ root, so new `.swift` files there are picked up on regenerate). Tests live under
 - `Remote/` — remote (SSH) projects: `FolderEntry.remote` (`RemoteTarget`),
   `SSHCommand` (validated, quoted `ssh -t … -- DEST '<script>'` line typed into
   a local shell in `$HOME`), `RemoteLaunch` (pre-assigned `--session-id`, resume
-  on restore). No local git/usage tracking for remote panes. See "Remote projects".
+  on restore). `RemotePaneMonitor` brings hook events, usage and the git
+  branch of remote panes over background ssh; `RemoteHookInstaller` installs
+  the hooks on the host. See "Remote projects".
 - `Git/` — reading the branch from `.git/HEAD` (no subprocess) plus on-demand
   branch listing / switching / stats via `git`.
 - `Stats/`, `Usage/` — stats model + scanner, and live token-usage parsing.
@@ -145,8 +147,31 @@ spawns the local login shell in `$HOME` and types the line built by the pure
 shell; the remote command runs in `"$SHELL" -i -l -c` with `VSVIBE_PANE_ID`
 exported). With *Runs Claude* on, `RemoteLaunch` starts `CMD --session-id <uuid>`
 and records the id immediately; restore runs `CMD --resume <id> || exec CMD
---session-id <id>`. No remote hooks, usage or git branch yet (Phase B).
-Details: `docs/remote-projects.md`. Code: `VSVibe/Remote/`.
+--session-id <id>`.
+
+Background ssh calls (never the pane's line) run `/usr/bin/ssh` with an argv
+array, no local shell (`RemoteSSH`): `BatchMode=yes`, `ConnectTimeout=10`, one
+multiplexed connection per host (`ControlPath=~/.vsvibe/ssh/cm-%C`, dir 0700,
+`ControlPersist=60`), `--` before the destination, and the remote script run as
+`exec /bin/sh -c '<script>'` with every value `SSHCommand.shellQuoted`. Behind
+`RemoteShellRunning` (one-shot, `SSHCommandRunner`) and `RemoteProcessLaunching`
+(streams, `SSHStreamLauncher`), so everything above them is unit-tested with
+fakes. `RemotePaneMonitor` (owned by `AppEnvironment`, fed by `SessionManager`):
+- events: one `tail -n 0 -F ~/.vsvibe/events.jsonl` stream per (host, port) with
+  open remote panes (`RemoteEventStreams`, reconnect with `ReconnectBackoff`),
+  lines → `HookEvent` → `EventCoordinator.handleRemote`, which only matches the
+  remote pane named by `paneId` (the local events file never routes to remote
+  panes);
+- usage: once a hook event reports the remote `transcript_path`,
+  `tail -c +1 -F <path>` → `UsageAccumulator` off-main (`RemoteUsageTracker`);
+  nothing before that;
+- git branch: polled every 20 s (`RemoteBranchTracker`); failures hide it.
+`RemoteHookInstaller` writes `HookScript` to the remote
+`~/.vsvibe/hooks/claude-notify.sh` and merges `settings.json` with the same pure
+`HookSettings` functions as `HookInstaller` (config dir: the remote alias's
+`CLAUDE_CONFIG_DIR` from `"$SHELL" -i -l`, else `~/.claude`); the project editor
+shows its status (`RemoteHookSetupModel`). Details: `docs/remote-projects.md`.
+Code: `VSVibe/Remote/`.
 
 ## Releases and auto-update
 

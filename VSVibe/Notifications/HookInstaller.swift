@@ -70,8 +70,6 @@ internal enum HookInstaller {
     /// Events the installer registers. `SessionStart` tells VSVibe each pane's
     /// Claude session id before the first turn finishes (and after `/clear`).
     nonisolated internal static let installedEvents = ["SessionStart", "Stop", "Notification"]
-    /// Events the installer recognises (and cleans up) as its own.
-    private static let managedEvents = ["SessionStart", "Stop", "Notification", "SubagentStop"]
     private static let scriptPermissions: Int16 = 0o755
 
     // MARK: - Status
@@ -96,7 +94,7 @@ internal enum HookInstaller {
                 return nil
             }
             let events = (try? readSettings(at: settingsURL))
-                .flatMap { ($0["hooks"] as? [String: Any]).map(registeredEvents(in:)) } ?? []
+                .map { HookSettings.registeredEvents(inSettings: $0, scriptPath: hookScriptURL.path) } ?? []
             let dirState = alias.claudeConfigDir.map { ClaudeConfigDirState.of($0) } ?? .missing
             return AliasStatus(alias: alias, registeredEvents: events, configDirState: dirState)
         }
@@ -134,14 +132,11 @@ internal enum HookInstaller {
             return
         }
         try mutateSettings(at: settingsURL) { json in
-            var hooks = (json["hooks"] as? [String: Any]) ?? [:]
-            for event in installedEvents {
-                var entries = (hooks[event] as? [[String: Any]]) ?? []
-                entries.removeAll { ownsEntry($0) }
-                entries.append(makeEntry(forEvent: event))
-                hooks[event] = entries
-            }
-            json["hooks"] = hooks
+            json = HookSettings.installing(
+                into: json,
+                scriptPath: hookScriptURL.path,
+                scriptCommand: hookScriptURL.path
+            )
         }
     }
 
@@ -156,34 +151,7 @@ internal enum HookInstaller {
             return
         }
         try mutateSettings(at: settingsURL) { json in
-            guard var hooks = json["hooks"] as? [String: Any] else {
-                return
-            }
-            for event in managedEvents {
-                guard var entries = hooks[event] as? [[String: Any]] else {
-                    continue
-                }
-                entries.removeAll { ownsEntry($0) }
-                if entries.isEmpty {
-                    hooks.removeValue(forKey: event)
-                } else {
-                    hooks[event] = entries
-                }
-            }
-            if hooks.isEmpty {
-                json.removeValue(forKey: "hooks")
-            } else {
-                json["hooks"] = hooks
-            }
-        }
-    }
-
-    internal static func registeredEvents(in hooks: [String: Any]) -> [String] {
-        managedEvents.filter { event in
-            guard let entries = hooks[event] as? [[String: Any]] else {
-                return false
-            }
-            return entries.contains { ownsEntry($0) }
+            json = HookSettings.uninstalling(from: json, scriptPath: hookScriptURL.path)
         }
     }
 
@@ -193,44 +161,11 @@ internal enum HookInstaller {
 
     // MARK: - Private helpers
 
-    private static func makeEntry(forEvent eventName: String) -> [String: Any] {
-        [
-            "matcher": "",
-            "hooks": [
-                [
-                    "type": "command",
-                    "command": "\(hookScriptURL.path) \(eventName)",
-                    "_id": hookCommandIdentifier
-                ]
-            ]
-        ]
-    }
-
-    private static func ownsEntry(_ entry: [String: Any]) -> Bool {
-        guard let hooks = entry["hooks"] as? [[String: Any]] else {
-            return false
-        }
-        return hooks.contains { hook in
-            if (hook["_id"] as? String) == hookCommandIdentifier {
-                return true
-            }
-            guard let command = hook["command"] as? String else {
-                return false
-            }
-            return command.contains(hookScriptURL.path)
-        }
-    }
-
     private static func readSettings(at url: URL) throws -> [String: Any] {
         guard FileManager.default.fileExists(atPath: url.path) else {
             return [:]
         }
-        let data = try Data(contentsOf: url)
-        guard !data.isEmpty else {
-            return [:]
-        }
-        let object = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
-        return (object as? [String: Any]) ?? [:]
+        return try HookSettings.object(from: Data(contentsOf: url))
     }
 
     private static func mutateSettings(at url: URL, _ mutate: (inout [String: Any]) -> Void) throws {
@@ -248,7 +183,6 @@ internal enum HookInstaller {
 
         mutate(&json)
 
-        let outData = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
-        try outData.write(to: url, options: [.atomic])
+        try HookSettings.data(of: json).write(to: url, options: [.atomic])
     }
 }

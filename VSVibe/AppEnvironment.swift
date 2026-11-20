@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -13,12 +14,17 @@ internal final class AppEnvironment {
     internal let sessionRestore: SessionRestoreController
     /// Launch prompt to install / update the Claude hooks.
     internal let hookPrompt: HookPromptController
+    /// Events, git branch and usage of remote panes, over ssh.
+    internal let remoteMonitor: RemotePaneMonitor
+    /// Installs the Claude hooks on remote projects' hosts.
+    internal let remoteHookInstaller: RemoteHookInstaller
     internal var pendingEditor: ProjectEditorMode?
     internal var pendingLabelEditor: LabelEditorMode?
     internal var isManageLabelsPresented: Bool = false
     internal var isHookSetupPresented: Bool = false
     internal var pendingStats: FolderEntry?
     internal var pendingGitReview: FolderEntry?
+    @ObservationIgnored private var terminationObserver: (any NSObjectProtocol)?
 
     /// Local folder of the currently focused pane, if any (nil for a remote project).
     internal var focusedFolderURL: URL? {
@@ -37,11 +43,19 @@ internal final class AppEnvironment {
         let aliases = LaunchAliasStore()
         self.aliasStore = aliases
         let stats = StatsStore { aliases.aliases }
-        let manager = SessionManager(statsStore: stats, aliasStore: aliases)
+        let remoteServices = RemoteServices.live
+        let monitor = RemotePaneMonitor(services: remoteServices)
+        let manager = SessionManager(statsStore: stats, aliasStore: aliases, remoteMonitor: monitor)
+        let coordinator = EventCoordinator(folderStore: store, sessionManager: manager, statsStore: stats)
+        monitor.onEvent = { [weak coordinator] event in
+            coordinator?.handleRemote(event)
+        }
         self.folderStore = store
         self.statsStore = stats
         self.sessionManager = manager
-        self.eventCoordinator = EventCoordinator(folderStore: store, sessionManager: manager, statsStore: stats)
+        self.eventCoordinator = coordinator
+        self.remoteMonitor = monitor
+        self.remoteHookInstaller = RemoteHookInstaller(runner: remoteServices.runner)
         self.diskSpaceMonitor = DiskSpaceMonitor()
         self.sessionRestore = SessionRestoreController(
             sessionManager: manager,
@@ -69,6 +83,19 @@ internal final class AppEnvironment {
     internal func startEventStream() {
         eventCoordinator.start()
         diskSpaceMonitor.start()
+        // Remote streams are ssh child processes: end them when the app quits
+        // (registered once, even when the window's task runs again).
+        if terminationObserver == nil {
+            terminationObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.willTerminateNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.remoteMonitor.stopAll()
+                }
+            }
+        }
         // Never touch the user's panes or sessions.json, or prompt, from the unit-test host.
         if !SessionRestoreController.isUnitTestHost(environment: ProcessInfo.processInfo.environment) {
             sessionRestore.start()

@@ -16,28 +16,22 @@ internal final class SessionManager {
     @ObservationIgnored private let statsStore: StatsStore
     @ObservationIgnored private let aliasStore: LaunchAliasStore
     @ObservationIgnored private let launcher: SessionLauncher
+    /// Events, git branch and usage of remote panes (nil: not monitored).
+    @ObservationIgnored private let remoteMonitor: RemotePaneMonitor?
 
     /// The running usage tracker of each pane that has one.
     internal var usageTrackers: [TerminalSession.ID: UsageTracker] { usageTracking.trackers }
 
-    /// The open panes (in order) and focus, as persisted for restore on launch.
-    internal var snapshot: SessionSnapshot {
-        SessionSnapshot(
-            panes: sessions.map { session in
-                PaneSnapshot(
-                    folderID: session.folder.id,
-                    claudeSessionID: session.claudeSessionID,
-                    transcriptPath: session.claudeTranscriptPath
-                )
-            },
-            focusedIndex: focusedSessionID.flatMap { id in sessions.firstIndex { $0.id == id } }
-        )
-    }
-
-    internal init(statsStore: StatsStore, aliasStore: LaunchAliasStore, launcher: SessionLauncher? = nil) {
+    internal init(
+        statsStore: StatsStore,
+        aliasStore: LaunchAliasStore,
+        launcher: SessionLauncher? = nil,
+        remoteMonitor: RemotePaneMonitor? = nil
+    ) {
         self.aliasStore = aliasStore
         self.statsStore = statsStore
         self.launcher = launcher ?? .live
+        self.remoteMonitor = remoteMonitor
     }
 
     internal func ensureSession(for folder: FolderEntry, commandOverride: String? = nil) {
@@ -74,14 +68,20 @@ internal final class SessionManager {
             recordClaudeConversation(claudeSessionID, transcriptPath: transcriptPath, in: session)
             return session
         }
-        // A remote pane resumes `claudeSessionID` itself (`RemoteLaunch`).
-        return makeSession(for: folder, commandOverride: command, resumeClaudeSessionID: claudeSessionID)
+        // A remote pane resumes `claudeSessionID` itself (`RemoteLaunch`); its
+        // transcript (on the remote host) is still that conversation's.
+        let session = makeSession(for: folder, commandOverride: command, resumeClaudeSessionID: claudeSessionID)
+        if let resumed = session.claudeSessionID, resumed == claudeSessionID, transcriptPath != nil {
+            recordClaudeConversation(resumed, transcriptPath: transcriptPath, in: session)
+        }
+        return session
     }
 
     /// Records the Claude conversation running in `session` (from its hook
     /// events or a restore) and points the pane's usage tracker at that
     /// conversation's transcript (or back at the launch alias's latest one
-    /// when the path is unknown). Ignored for usage when the pane is closed.
+    /// when the path is unknown; a remote pane streams its remote transcript
+    /// and shows nothing without one). Ignored for usage when the pane is closed.
     internal func recordClaudeConversation(
         _ claudeSessionID: String?,
         transcriptPath: String?,
@@ -89,23 +89,14 @@ internal final class SessionManager {
     ) {
         session.claudeSessionID = claudeSessionID
         session.claudeTranscriptPath = transcriptPath
-        // Remote transcripts are on the remote host: no local usage tracking
-        // (remote usage would plug in here).
-        if !session.folder.isRemote, sessions.contains(where: { $0.id == session.id }) {
+        guard sessions.contains(where: { $0.id == session.id }) else {
+            return
+        }
+        if session.folder.isRemote {
+            remoteMonitor?.conversationChanged(session)
+        } else {
             usageTracking.refresh(session)
         }
-    }
-
-    internal func hasSession(forFolder folderID: FolderEntry.ID) -> Bool {
-        sessions.contains { $0.folder.id == folderID }
-    }
-
-    internal func sessions(forFolder folderID: FolderEntry.ID) -> [TerminalSession] {
-        sessions.filter { $0.folder.id == folderID }
-    }
-
-    internal func firstSession(forFolder folderID: FolderEntry.ID) -> TerminalSession? {
-        sessions.first { $0.folder.id == folderID }
     }
 
     internal func closeAllSessions(forFolder folderID: FolderEntry.ID) {
@@ -122,6 +113,7 @@ internal final class SessionManager {
         session.terminalView.processDelegate = nil
         terminate(session: session)
         usageTracking.stop(id: id)
+        remoteMonitor?.paneClosed(id: id)
         gitTrackers[id]?.stop()
         gitTrackers[id] = nil
         openedAt[id] = nil
@@ -140,6 +132,7 @@ internal final class SessionManager {
             terminate(session: session)
         }
         usageTracking.stopAll()
+        remoteMonitor?.stopAll()
         for tracker in gitTrackers.values {
             tracker.stop()
         }
@@ -224,8 +217,9 @@ internal final class SessionManager {
     /// Starts the login shell in the user's home and types the `ssh` line
     /// (`SSHCommand`) that runs the remote command in the remote folder. The
     /// Claude conversation id `RemoteLaunch` chose is recorded right away, so
-    /// it is saved for restore without hooks. No local git / usage tracking:
-    /// the folder and transcripts are on the remote host. An invalid target
+    /// it is saved for restore without hooks. Git branch, hook events and
+    /// usage come over ssh (`RemotePaneMonitor`): the folder and transcripts
+    /// are on the remote host. An invalid target
     /// (e.g. a hand-edited state.json) types nothing and says why instead.
     private func launchRemote(
         _ remote: RemoteTarget,
@@ -244,6 +238,7 @@ internal final class SessionManager {
         case .success(let line):
             type(line, into: session)
             recordClaudeConversation(plan.claudeSessionID, transcriptPath: nil, in: session)
+            remoteMonitor?.paneOpened(session)
             verifyLaunchCommand(SSHCommand.executable, for: session)
             Log.session.info("Spawned remote session for \(remote.location, privacy: .public)")
 

@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The SSH fields of the project editor: host, port, remote folder, command
-/// and "Runs Claude". Parsing and validation live in `RemoteProjectForm`.
+/// The SSH fields of the project editor: host, port, remote folder, command,
+/// "Runs Claude" and the Claude hooks on the host. Parsing and validation
+/// live in `RemoteProjectForm`.
 internal struct RemoteProjectFields: View {
     private enum Layout {
         static let spacing: CGFloat = 12
@@ -10,6 +11,9 @@ internal struct RemoteProjectFields: View {
     }
 
     @Binding internal var form: RemoteProjectForm
+    internal let hookSetup: RemoteHookSetupModel
+    /// Check the hooks on the host as soon as the editor opens (editing).
+    internal let checksHooksAutomatically: Bool
 
     internal var body: some View {
         VStack(alignment: .leading, spacing: Layout.spacing) {
@@ -30,6 +34,13 @@ internal struct RemoteProjectFields: View {
             Text("ssh must log in without a prompt (keys or agent), or type the password in the pane.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            EditorField(label: "Claude hooks on the host") {
+                RemoteHookSection(
+                    target: try? form.target.get(),
+                    checksAutomatically: checksHooksAutomatically,
+                    model: hookSetup
+                )
+            }
         }
     }
 

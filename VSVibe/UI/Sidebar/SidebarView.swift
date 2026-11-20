@@ -36,6 +36,7 @@ internal struct SidebarView: View {
             ProjectEditorView(
                 mode: mode,
                 aliasStore: env.aliasStore,
+                remoteHookInstaller: env.remoteHookInstaller,
                 availableLabels: env.folderStore.labels,
                 availableAliases: env.aliasStore.aliases.map(\.command),
                 onSave: { result in env.commitEditor(mode: mode, result: result) },

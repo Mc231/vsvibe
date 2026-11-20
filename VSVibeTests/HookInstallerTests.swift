@@ -181,11 +181,12 @@ internal final class HookInstallerTests: XCTestCase {
         let ours: [String: Any] = ["hooks": [["_id": HookInstaller.hookCommandIdentifier]]]
         let noHooksArray: [String: Any] = ["matcher": ""]
         let unrelated: [String: Any] = ["hooks": [["type": "command"]]]
-        let events = HookInstaller.registeredEvents(in: [
+        let hooks: [String: Any] = [
             "Stop": [noHooksArray, unrelated],
             "Notification": "not-a-list",
             "SubagentStop": [ours]
-        ])
+        ]
+        let events = HookSettings.registeredEvents(in: hooks, scriptPath: HookInstaller.hookScriptURL.path)
         XCTAssertEqual(events, ["SubagentStop"])
     }
 

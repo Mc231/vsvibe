@@ -1,8 +1,10 @@
 import Foundation
 import Observation
 
-/// Routes Claude hook events (from `EventWatcher`) to the matching pane, the
-/// stats store and user notifications.
+/// Routes Claude hook events to the matching pane, the stats store and user
+/// notifications: events of the local events file (`EventWatcher`) to local
+/// panes, events streamed from a remote host (`RemotePaneMonitor`) to the
+/// remote pane named by their `paneId` only.
 @MainActor
 @Observable
 internal final class EventCoordinator {
@@ -55,25 +57,49 @@ internal final class EventCoordinator {
         }
     }
 
-    /// Applies one hook event: updates the matching pane (if any), records it
-    /// in the stats and posts a notification. `SessionStart` only records the
-    /// pane's Claude session id.
+    /// Applies one event of the local events file: updates the matching
+    /// local pane (if any), records it in the stats and posts a notification.
+    /// `SessionStart` only records the pane's Claude session id. Events naming
+    /// a remote pane are left to its host's stream (`handleRemote`).
     internal func handle(_ event: HookEvent) {
+        log(event)
+        let paneMatch = event.paneID.flatMap(openSession(withID:))
+        if paneMatch?.folder.isRemote == true {
+            return
+        }
+        guard let session = paneMatch ?? matchSession(forProjectDir: event.projectDir) else {
+            if event.event != .sessionStart {
+                handleUnmatched(event)
+            }
+            return
+        }
+        apply(event, to: session)
+    }
+
+    /// Applies one event streamed from a remote host. It only ever reaches the
+    /// open remote pane its `paneId` names; anything else (another machine's
+    /// pane, a terminal outside VSVibe) is dropped.
+    internal func handleRemote(_ event: HookEvent) {
+        log(event)
+        guard let session = event.paneID.flatMap(openSession(withID:)), session.folder.isRemote else {
+            Log.app.info("Remote hook event for no open remote pane, ignored")
+            return
+        }
+        apply(event, to: session)
+    }
+
+    private func log(_ event: HookEvent) {
         lastEvent = event
         Log.app.info("Hook event: \(event.event.rawValue, privacy: .public) dir=\(event.projectDir, privacy: .public)")
+    }
 
-        let session = matchSession(for: event)
-        if let session {
-            recordClaudeSessionID(of: event, in: session)
-        }
+    /// Records the conversation, then (except for `SessionStart`) updates the
+    /// pane, the stats and posts a notification.
+    private func apply(_ event: HookEvent, to session: TerminalSession) {
+        recordClaudeSessionID(of: event, in: session)
         guard event.event != .sessionStart else {
             return
         }
-        guard let session else {
-            handleUnmatched(event)
-            return
-        }
-
         applyToSession(session, event: event)
         statsStore.recordHookEvent(folderURL: session.folder.url, kind: event.event)
 
@@ -99,14 +125,8 @@ internal final class EventCoordinator {
         )
     }
 
-    /// The pane named by the event's `paneId` when it is still open, else the
-    /// first pane whose folder is the event's project dir (events from old hook
-    /// scripts or from terminals outside VSVibe).
-    private func matchSession(for event: HookEvent) -> TerminalSession? {
-        if let paneID = event.paneID, let session = sessionManager.sessions.first(where: { $0.id == paneID }) {
-            return session
-        }
-        return matchSession(forProjectDir: event.projectDir)
+    private func openSession(withID id: TerminalSession.ID) -> TerminalSession? {
+        sessionManager.sessions.first { $0.id == id }
     }
 
     /// Keeps the latest Claude session id of a pane, with its transcript path
@@ -125,12 +145,17 @@ internal final class EventCoordinator {
         sessionManager.recordClaudeConversation(claudeSessionID, transcriptPath: transcriptPath, in: session)
     }
 
+    /// The first local pane whose folder is the event's project dir (events
+    /// from old hook scripts or from terminals outside VSVibe).
     private func matchSession(forProjectDir projectDir: String) -> TerminalSession? {
         guard !projectDir.isEmpty else {
             return nil
         }
         let target = URL(fileURLWithPath: projectDir).standardizedFileURL.resolvingSymlinksInPath().path
         return sessionManager.sessions.first { session in
+            guard !session.folder.isRemote else {
+                return false
+            }
             let sessionPath = session.folder.url.standardizedFileURL.resolvingSymlinksInPath().path
             return sessionPath == target
         }

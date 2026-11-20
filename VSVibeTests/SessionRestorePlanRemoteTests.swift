@@ -2,7 +2,8 @@
 import XCTest
 
 /// Restore of remote panes: their saved conversation id is resumed by the pane
-/// itself, without transcript checks (the transcript is on the remote host).
+/// itself, without transcript checks (the transcript is on the remote host);
+/// a valid transcript path is carried along.
 internal final class SessionRestorePlanRemoteTests: XCTestCase {
     private let claude = FolderEntry(remote: RemoteTarget(destination: "dev", command: "claudework"))
     private let plain = FolderEntry(remote: RemoteTarget(destination: "dev", command: "htop", runsClaude: false))
@@ -35,8 +36,18 @@ internal final class SessionRestorePlanRemoteTests: XCTestCase {
 
         XCTAssertEqual(pane?.command, "claudework")
         XCTAssertEqual(pane?.claudeSessionID, "conv")
-        XCTAssertNil(pane?.transcriptPath)
+        XCTAssertEqual(pane?.transcriptPath, "/home/me/.claude/projects/p/conv.jsonl")
         XCTAssertEqual(pane?.resolution, .resumedRemote)
+    }
+
+    internal func testInvalidTranscriptPathIsDropped() {
+        let pane = plan([
+            PaneSnapshot(folderID: claude.id, claudeSessionID: "conv", transcriptPath: "/home/me/elsewhere.jsonl")
+        ])
+        .panes.first
+
+        XCTAssertEqual(pane?.claudeSessionID, "conv")
+        XCTAssertNil(pane?.transcriptPath)
     }
 
     internal func testOtherPanesRunTheRemoteCommand() {
