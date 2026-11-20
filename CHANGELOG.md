@@ -10,6 +10,16 @@ is missing.
 
 ## [Unreleased]
 
+### Added
+
+- Remote (SSH) projects: *File → New Remote Project…* (or the network button
+  in the sidebar) adds a project that lives on another machine. Its panes `ssh`
+  to the host, change to the remote folder and run Claude, an alias such as
+  `claudework`, any other command or just a shell there. Claude panes resume
+  their own conversation when VSVibe restores them, without hooks. Hook
+  notifications, token usage and the git branch are not shown for remote panes
+  yet.
+
 ## [0.2.1] - 2026-11-15
 
 ### Fixed

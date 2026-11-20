@@ -93,10 +93,13 @@ NOTARIZE=1 scripts/build-dmg.sh   # Developer ID signed + notarized + stapled
 See [`scripts/NOTARIZE.md`](scripts/NOTARIZE.md) for the one-time
 notarization setup.
 
-## Session restore and auto-update
+## Session restore, remote projects and auto-update
 
 - [Session restore](docs/session-restore.md): panes reopen on launch and each
   Claude pane resumes its own conversation (Settings → General).
+- [Remote projects](docs/remote-projects.md): a project on another machine;
+  its panes `ssh` in, `cd` to the remote folder and run Claude (or any command)
+  there, and restore resumes each pane's conversation.
 - [Auto-update and releases](docs/auto-update-and-releases.md): Sparkle 2
   updates (Settings → Updates, "Check for Updates…") and the notarized release
   pipeline triggered by a `vX.Y.Z` tag.
@@ -112,6 +115,7 @@ VSVibe/
   Usage/                 live Claude token-usage tracking
   Git/                   branch reading (.git/HEAD) and on-demand git operations
   Notifications/         Claude hook installer, event watcher and coordinator
+  Remote/                remote (SSH) projects: target model, ssh line builder, launch plan
   Terminal/              SwiftTerm hosting, shell/command resolution
   UI/                    SwiftUI views: sidebar, tiling grid, pane chrome, stats
   Util/                  small helpers (debounce, logging, editor registry, ...)

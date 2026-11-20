@@ -60,6 +60,10 @@ root, so new `.swift` files there are picked up on regenerate). Tests live under
 - `HookPromptController` — on launch (not in the test host) offers to install
   or update missing/outdated hooks; "Don't ask again" is UserDefaults
   `hookPromptDismissedScriptVersion` (reset by a new `HookScript.version`).
+- `Remote/` — remote (SSH) projects: `FolderEntry.remote` (`RemoteTarget`),
+  `SSHCommand` (validated, quoted `ssh -t … -- DEST '<script>'` line typed into
+  a local shell in `$HOME`), `RemoteLaunch` (pre-assigned `--session-id`, resume
+  on restore). No local git/usage tracking for remote panes. See "Remote projects".
 - `Git/` — reading the branch from `.git/HEAD` (no subprocess) plus on-demand
   branch listing / switching / stats via `git`.
 - `Stats/`, `Usage/` — stats model + scanner, and live token-usage parsing.
@@ -130,6 +134,19 @@ plan (`SessionRestorePlan`) is pure: alias lookups and the file-existence check
 are injected. After upgrading, click **Update Hooks**
 in *Aliases & Claude Hooks…* and restart running Claude sessions. Details:
 `docs/session-restore.md`. Code: `VSVibe/Restore/`.
+
+## Remote projects
+
+A project may live on another machine (`FolderEntry.remote`, created with *File →
+New Remote Project…* or the sidebar's network button). Its `url` is only an
+identity/stats key (`/.vsvibe-remote/<id>` for new ones), never a cwd. A pane
+spawns the local login shell in `$HOME` and types the line built by the pure
+`SSHCommand` (every field validated; POSIX single quotes for the local and remote
+shell; the remote command runs in `"$SHELL" -i -l -c` with `VSVIBE_PANE_ID`
+exported). With *Runs Claude* on, `RemoteLaunch` starts `CMD --session-id <uuid>`
+and records the id immediately; restore runs `CMD --resume <id> || exec CMD
+--session-id <id>`. No remote hooks, usage or git branch yet (Phase B).
+Details: `docs/remote-projects.md`. Code: `VSVibe/Remote/`.
 
 ## Releases and auto-update
 
