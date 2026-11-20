@@ -19,6 +19,7 @@ internal struct SessionLauncher {
     internal static let live = Self(
         makeTerminalView: Self.makeTerminalView,
         spawnShell: Self.spawnShell,
+        typeCommand: Self.typeCommand,
         isOnSearchPath: Self.isOnSearchPath,
         loginShellAvailability: { command, shell in
             CommandLocator.loginShellAvailability(command, shell: shell)
@@ -31,6 +32,8 @@ internal struct SessionLauncher {
     /// Starts the login shell in `folder` inside the view; the pane id is
     /// exported to the shell as `VSVIBE_PANE_ID`.
     internal var spawnShell: (LocalProcessTerminalView, URL, UUID) -> Void
+    /// Types a command line (plus return) into the pane's shell.
+    internal var typeCommand: (LocalProcessTerminalView, String) -> Void
     /// Fast PATH probe for a bare executable name.
     internal var isOnSearchPath: (String) -> Bool
     /// Authoritative (slow, timeout-bounded) check via the interactive login
@@ -48,6 +51,10 @@ internal struct SessionLauncher {
 
     internal static func spawnShell(in view: LocalProcessTerminalView, at folder: URL, paneID: UUID) {
         view.spawnShell(at: folder, paneID: paneID)
+    }
+
+    internal static func typeCommand(in view: LocalProcessTerminalView, command: String) {
+        view.injectCommand(command)
     }
 
     internal static func isOnSearchPath(_ command: String) -> Bool {

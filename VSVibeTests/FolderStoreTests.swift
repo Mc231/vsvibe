@@ -38,11 +38,13 @@ internal final class FolderStoreTests: XCTestCase {
 
     // MARK: - Projects
 
-    internal func testAddSkipsDuplicatePaths() {
+    internal func testCreateProjectSkipsDuplicatePaths() {
         let store = makeStore()
-        store.add(url: url("a"))
-        store.add(url: url("a"))
+        let first = store.createProject(url: url("a"), name: "A", launchCommand: "claude")
+        let second = store.createProject(url: url("a/../a"), name: "A2", launchCommand: "codex")
         XCTAssertEqual(store.folders.count, 1)
+        XCTAssertEqual(second.id, first.id)
+        XCTAssertEqual(store.folders.first?.displayName, "A2")
     }
 
     internal func testCreateProjectWithLabels() throws {
@@ -182,6 +184,56 @@ internal final class FolderStoreTests: XCTestCase {
         let store = makeStore()
         XCTAssertTrue(store.folders.isEmpty)
         XCTAssertTrue(store.labels.isEmpty)
+    }
+
+    // MARK: - Remote projects
+
+    internal func testCreateRemoteProjectsPersist() throws {
+        let store = makeStore()
+        let label = try XCTUnwrap(store.createLabel(name: "Servers"))
+        let target = RemoteTarget(destination: "dev", remotePath: "/srv/api")
+        let named = store.createProject(name: " API ", location: .remote(target), labelIDs: [label.id, UUID()])
+        let unnamed = store.createProject(name: "", location: .remote(target))
+
+        XCTAssertNotEqual(named.id, unnamed.id, "every remote project is new")
+        XCTAssertEqual(named.displayName, "API")
+        XCTAssertEqual(unnamed.displayName, "api (dev)")
+        XCTAssertEqual(named.labelIDs, [label.id])
+        waitForSave()
+
+        let reloaded = makeStore()
+        XCTAssertEqual(reloaded.folders.map(\.remote), [target, target])
+        XCTAssertEqual(reloaded.folders.map(\.url), [named.url, unnamed.url])
+    }
+
+    internal func testCreateLocalProjectThroughLocation() {
+        let store = makeStore()
+        let entry = store.createProject(name: "API", location: .local(folder: url("api"), launchCommand: "codex"))
+        XCTAssertEqual(entry.url, url("api"))
+        XCTAssertEqual(entry.launchCommand, "codex")
+        XCTAssertNil(entry.remote)
+    }
+
+    internal func testUpdateProjectSwitchesBetweenLocalAndRemote() {
+        let store = makeStore()
+        let entry = store.createProject(url: url("api"), name: "API", launchCommand: "codex")
+        let target = RemoteTarget(destination: "dev")
+
+        store.updateProject(id: entry.id, name: "", location: .remote(target), labelIDs: [])
+        XCTAssertEqual(store.folders.first?.remote, target)
+        XCTAssertEqual(store.folders.first?.launchCommand, "ssh")
+        XCTAssertEqual(store.folders.first?.url, url("api"), "the identity (stats key) is kept")
+        XCTAssertEqual(store.folders.first?.displayName, "API")
+
+        let box = ProjectLocation.local(folder: url("box"), launchCommand: "claude")
+        store.updateProject(id: entry.id, name: "Box", location: box, labelIDs: [])
+        XCTAssertNil(store.folders.first?.remote)
+        XCTAssertEqual(store.folders.first?.url, url("box"))
+        XCTAssertEqual(store.folders.first?.launchCommand, "claude")
+        XCTAssertEqual(store.folders.first?.displayName, "Box")
+
+        store.updateProject(id: UUID(), name: "X", location: .remote(target), labelIDs: [])
+        XCTAssertEqual(store.folders.count, 1)
     }
 
     deinit {

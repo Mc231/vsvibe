@@ -28,18 +28,6 @@ internal final class FolderStore {
         load()
     }
 
-    internal func add(url: URL) {
-        let resolved = url.standardizedFileURL
-        if folders.contains(where: { $0.url.standardizedFileURL == resolved }) {
-            Log.store.info("Folder already in list: \(resolved.path, privacy: .public)")
-            return
-        }
-        let entry = FolderEntry(url: resolved)
-        folders.append(entry)
-        scheduleSave()
-        Log.store.info("Added folder: \(resolved.path, privacy: .public)")
-    }
-
     @discardableResult
     internal func createProject(
         url: URL,
@@ -62,6 +50,51 @@ internal final class FolderStore {
         scheduleSave()
         Log.store.info("Created project \(name, privacy: .public) at \(resolved.path, privacy: .public)")
         return entry
+    }
+
+    /// Creates a project at `location`: a local one through
+    /// `createProject(url:name:launchCommand:labelIDs:)` (an existing project
+    /// for that folder is updated instead), a remote one always new.
+    @discardableResult
+    internal func createProject(
+        name: String,
+        location: ProjectLocation,
+        labelIDs: [ProjectLabel.ID] = []
+    ) -> FolderEntry {
+        switch location {
+        case let .local(folder, launchCommand):
+            return createProject(url: folder, name: name, launchCommand: launchCommand, labelIDs: labelIDs)
+
+        case .remote(let target):
+            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let entry = FolderEntry(
+                remote: target,
+                displayName: trimmedName.isEmpty ? nil : trimmedName,
+                labelIDs: sanitized(labelIDs)
+            )
+            folders.append(entry)
+            scheduleSave()
+            Log.store.info("Created remote project \(entry.displayName, privacy: .public)")
+            return entry
+        }
+    }
+
+    /// Updates name (blank is ignored), location and labels. Turning a local
+    /// project remote keeps its `url` as its identity (so its stats stay);
+    /// turning a remote one local points it at the chosen folder.
+    internal func updateProject(
+        id: FolderEntry.ID,
+        name: String,
+        location: ProjectLocation,
+        labelIDs: [ProjectLabel.ID]
+    ) {
+        guard let idx = applyNameAndCommand(id: id, name: name, launchCommand: location.launchCommand) else {
+            return
+        }
+        folders[idx].url = location.localFolder?.standardizedFileURL ?? folders[idx].url
+        folders[idx].remote = location.remote
+        folders[idx].labelIDs = sanitized(labelIDs)
+        scheduleSave()
     }
 
     /// Updates name and launch command (blank values are ignored), keeping the labels.

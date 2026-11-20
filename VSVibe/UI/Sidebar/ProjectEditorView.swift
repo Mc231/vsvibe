@@ -26,8 +26,7 @@ internal struct ProjectEditorView: View {
     internal let onSave: (ProjectEditorResult) -> Void
     internal let onCancel: () -> Void
 
-    @State private var name: String = ""
-    @State private var launchCommand: String = ""
+    @State private var draft = ProjectDraft()
     @State private var openImmediately: Bool = true
     @State private var missingCommand: String?
     @State private var selectedLabelIDs: [ProjectLabel.ID] = []
@@ -42,18 +41,8 @@ internal struct ProjectEditorView: View {
         }
         .frame(width: Layout.width)
         .onAppear { populate() }
-        .task(id: LaunchCommandResolver.baseCommand(of: trimmedCommand)) {
+        .task(id: draft.isRemote ? "" : LaunchCommandResolver.baseCommand(of: draft.trimmedLaunchCommand)) {
             await checkCommandAvailability()
-        }
-    }
-
-    private var url: URL {
-        switch mode {
-        case .create(let url):
-            url
-
-        case .edit(let folder):
-            folder.url
         }
     }
 
@@ -65,20 +54,16 @@ internal struct ProjectEditorView: View {
         mode.isCreate ? "Create" : "Save"
     }
 
-    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var trimmedCommand: String { launchCommand.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var canSave: Bool { !trimmedName.isEmpty && !trimmedCommand.isEmpty }
-
     private var header: some View {
         HStack(spacing: Layout.headerSpacing) {
-            Image(systemName: "square.stack.3d.up.fill")
+            Image(systemName: draft.isRemote ? "network" : "square.stack.3d.up.fill")
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Layout.titleSpacing) {
                 Text(title)
                     .font(.headline)
-                Text(url.path)
+                Text(draft.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -92,16 +77,25 @@ internal struct ProjectEditorView: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: Layout.formSpacing) {
-            field(label: "Name") {
-                TextField("Project name", text: $name)
+            Picker("Location", selection: $draft.isRemote) {
+                Text("Local folder").tag(false)
+                Text("Remote (SSH)").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            EditorField(label: "Name") {
+                TextField(draft.isRemote ? draft.remote.suggestedName : "Project name", text: $draft.name)
                     .textFieldStyle(.roundedBorder)
             }
 
-            field(label: "Launch command") {
-                launchCommandEditor
+            if draft.isRemote {
+                RemoteProjectFields(form: $draft.remote)
+            } else {
+                localFields
             }
 
-            field(label: "Labels") {
+            EditorField(label: "Labels") {
                 labelPicker
             }
 
@@ -114,18 +108,33 @@ internal struct ProjectEditorView: View {
         .padding(.vertical, Layout.formVerticalPadding)
     }
 
+    @ViewBuilder private var localFields: some View {
+        if draft.localFolder == nil {
+            EditorField(label: "Folder") {
+                Button("Choose Folder…") {
+                    AddFolderCommand.run { url in
+                        draft.localFolder = url
+                    }
+                }
+            }
+        }
+        EditorField(label: "Launch command") {
+            launchCommandEditor
+        }
+    }
+
     private var launchCommandEditor: some View {
         VStack(alignment: .leading, spacing: Layout.itemSpacing) {
-            TextField("claude", text: $launchCommand)
+            TextField("claude", text: $draft.launchCommand)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(.body, design: .monospaced))
             HStack(spacing: Layout.itemSpacing) {
                 ForEach(availableAliases, id: \.self) { alias in
                     CommandChip(
                         text: alias,
-                        isSelected: trimmedCommand == alias
+                        isSelected: draft.trimmedLaunchCommand == alias
                     ) {
-                        launchCommand = alias
+                        draft.launchCommand = alias
                     }
                 }
                 Spacer()
@@ -138,7 +147,7 @@ internal struct ProjectEditorView: View {
                 .font(.caption)
                 .foregroundStyle(.orange)
             }
-            ClaudeAccountNoticeView(launchCommand: trimmedCommand, aliasStore: aliasStore)
+            ClaudeAccountNoticeView(launchCommand: draft.trimmedLaunchCommand, aliasStore: aliasStore)
         }
     }
 
@@ -161,10 +170,12 @@ internal struct ProjectEditorView: View {
 
     private var footer: some View {
         HStack {
-            Button("Show in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([url])
+            if !draft.isRemote, let folder = draft.localFolder {
+                Button("Show in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([folder])
+                }
+                .buttonStyle(.borderless)
             }
-            .buttonStyle(.borderless)
             Spacer()
             Button("Cancel", role: .cancel) { onCancel() }
                 .keyboardShortcut(.cancelAction)
@@ -173,7 +184,7 @@ internal struct ProjectEditorView: View {
             }
             .keyboardShortcut(.defaultAction)
             .buttonStyle(.borderedProminent)
-            .disabled(!canSave)
+            .disabled(!draft.canSave)
         }
         .padding(.horizontal, Layout.horizontalPadding)
         .padding(.vertical, Layout.footerVerticalPadding)
@@ -195,14 +206,14 @@ internal struct ProjectEditorView: View {
         self.onCancel = onCancel
     }
 
-    /// Live availability check for the entered command. Fast PATH probe first;
-    /// when that misses, confirm via the interactive login shell (off-main,
-    /// debounced so we don't spawn a shell per keystroke; aliases from
-    /// `~/.zshrc` count). Warning only — never blocks saving, and a shell that
-    /// times out never warns.
+    /// Live availability check for the entered local command. Fast PATH probe
+    /// first; when that misses, confirm via the interactive login shell
+    /// (off-main, debounced so we don't spawn a shell per keystroke; aliases
+    /// from `~/.zshrc` count). Warning only — never blocks saving, and a shell
+    /// that times out never warns. Remote commands are not checked locally.
     private func checkCommandAvailability() async {
-        let base = LaunchCommandResolver.baseCommand(of: trimmedCommand)
-        guard !base.isEmpty else {
+        let base = LaunchCommandResolver.baseCommand(of: draft.trimmedLaunchCommand)
+        guard !draft.isRemote, !base.isEmpty else {
             missingCommand = nil
             return
         }
@@ -225,29 +236,20 @@ internal struct ProjectEditorView: View {
         missingCommand = availability == .missing ? base : nil
     }
 
-    @ViewBuilder
-    private func field<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: Layout.itemSpacing) {
-            Text(label)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-            content()
-        }
-    }
-
     private func populate() {
         switch mode {
         case .create(let url):
-            name = url.lastPathComponent
-            launchCommand = LaunchCommandResolver.defaultCommand(for: url)
+            draft = ProjectDraft(creatingAt: url)
+            openImmediately = true
+            selectedLabelIDs = []
+
+        case .createRemote:
+            draft = ProjectDraft()
             openImmediately = true
             selectedLabelIDs = []
 
         case .edit(let folder):
-            name = folder.displayName
-            launchCommand = folder.launchCommand
+            draft = ProjectDraft(editing: folder)
             openImmediately = false
             selectedLabelIDs = folder.labelIDs
         }
@@ -262,13 +264,13 @@ internal struct ProjectEditorView: View {
     }
 
     private func commit() {
-        guard canSave else {
+        guard draft.canSave, let location = draft.location else {
             return
         }
         onSave(
             ProjectEditorResult(
-                name: trimmedName,
-                launchCommand: trimmedCommand,
+                name: draft.effectiveName,
+                location: location,
                 openImmediately: openImmediately,
                 labelIDs: selectedLabelIDs
             )

@@ -34,12 +34,12 @@ internal struct SidebarRow: View {
 
     internal var body: some View {
         HStack(spacing: Layout.spacing) {
-            Image(systemName: "folder.fill")
+            Image(systemName: folder.isRemote ? "network" : "folder.fill")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Layout.textSpacing) {
                 titleLine
-                Text(folder.url.path)
+                Text(folder.locationDescription)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
@@ -70,8 +70,8 @@ internal struct SidebarRow: View {
             Text(folder.displayName)
                 .lineLimit(1)
                 .truncationMode(.middle)
-            if folder.launchCommand != LaunchCommandResolver.defaultCommand {
-                Text(folder.launchCommand)
+            if folder.primaryCommand != LaunchCommandResolver.defaultCommand {
+                Text(folder.primaryCommand.isEmpty ? "shell" : folder.primaryCommand)
                     .font(.system(size: Layout.badgeFontSize, weight: .semibold, design: .monospaced))
                     .padding(.horizontal, Layout.badgeHorizontalPadding)
                     .padding(.vertical, Layout.badgeVerticalPadding)
@@ -105,7 +105,7 @@ internal struct SidebarRow: View {
         }
         .buttonStyle(.borderless)
         .opacity(isHovering ? 1.0 : Layout.dimmedOpacity)
-        .help("Continue Last Session (\(LaunchCommandResolver.continueCommand(for: folder.launchCommand)))")
+        .help("Continue Last Session (\(LaunchCommandResolver.continueCommand(for: folder.primaryCommand)))")
     }
 
     private var openButton: some View {

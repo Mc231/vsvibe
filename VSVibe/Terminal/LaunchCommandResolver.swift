@@ -12,6 +12,8 @@ internal enum LaunchCommandResolver {
     private static let conversationFlags: Set<String> = ["--continue", "-c"]
     /// Flags that may take the conversation id as their next argument.
     private static let resumeFlags: Set<String> = ["--resume", "-r"]
+    /// Flag that starts a conversation with a chosen id (takes the id).
+    private static let sessionIDFlags: Set<String> = ["--session-id"]
 
     /// Known launch aliases. For Claude-family aliases, the `claudeConfigDir`
     /// tells us where to install Stop/Notification hooks. opencode uses its
@@ -78,6 +80,30 @@ internal enum LaunchCommandResolver {
     /// `--resume <claudeSessionID>` appended. Callers validate the id first
     /// (`isValidClaudeSessionID`).
     internal static func resumeCommand(for command: String, claudeSessionID: String) -> String {
+        let kept = tokens(of: command, removing: resumeFlags)
+        return (kept + ["--resume", claudeSessionID]).joined(separator: " ")
+    }
+
+    /// `command` without any flag that picks a conversation (`--continue`,
+    /// `-c`, `--resume [x]`, `-r [x]`, `--session-id x`, `--…=x` forms), so a
+    /// specific conversation id can be appended.
+    internal static func withoutConversationFlags(_ command: String) -> String {
+        tokens(of: command, removing: resumeFlags.union(sessionIDFlags)).joined(separator: " ")
+    }
+
+    /// Whether `command` already picks its conversation with one of the flags
+    /// `withoutConversationFlags` removes.
+    internal static func hasConversationFlag(_ command: String) -> Bool {
+        let valueFlags = resumeFlags.union(sessionIDFlags)
+        return command.split(separator: " ").contains { token in
+            conversationFlags.contains(String(token))
+                || valueFlags.contains { token == $0 || token.hasPrefix("\($0)=") }
+        }
+    }
+
+    /// The tokens of `command` minus `--continue`/`-c` and each of
+    /// `valueFlags` with its value (`--flag x`, `--flag=x`).
+    private static func tokens(of command: String, removing valueFlags: Set<String>) -> [String] {
         let tokens = command.trimmingCharacters(in: .whitespacesAndNewlines)
             .split(separator: " ")
             .map(String.init)
@@ -86,16 +112,16 @@ internal enum LaunchCommandResolver {
         while index < tokens.endIndex {
             let token = tokens[index]
             index += 1
-            if resumeFlags.contains(token) {
+            if valueFlags.contains(token) {
                 // Drop the flag's value too, unless the next token is another flag.
                 if index < tokens.endIndex, !tokens[index].hasPrefix("-") {
                     index += 1
                 }
-            } else if !conversationFlags.contains(token), !token.hasPrefix("--resume=") {
+            } else if !conversationFlags.contains(token), !valueFlags.contains(where: { token.hasPrefix("\($0)=") }) {
                 kept.append(token)
             }
         }
-        return (kept + ["--resume", claudeSessionID]).joined(separator: " ")
+        return kept
     }
 
     /// All folders use the same default; custom commands are selected explicitly.

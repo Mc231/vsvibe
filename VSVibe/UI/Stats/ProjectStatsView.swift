@@ -72,7 +72,7 @@ internal struct ProjectStatsView: View {
                 Text(folder.displayName)
                     .font(.title2)
                     .fontWeight(.semibold)
-                Text(folder.url.path)
+                Text(folder.locationDescription)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -253,6 +253,10 @@ internal struct ProjectStatsView: View {
         isScanning = true
         await env.statsStore.scanTranscripts(forFolderURL: folder.url)
         isScanning = false
+        // A remote project's folder (and git history) is on the remote host.
+        guard !folder.isRemote else {
+            return
+        }
         let url = folder.url
         let windowDays = Self.gitWindowDays
         gitStats = await Task.detached { GitInfo.collectStats(forFolder: url, windowDays: windowDays) }.value

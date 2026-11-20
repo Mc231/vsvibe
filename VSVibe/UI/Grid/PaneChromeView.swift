@@ -43,6 +43,7 @@ internal struct PaneChromeView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
 
+            remoteBadge
             branchButton
             eventIndicator
             statusLabel
@@ -75,6 +76,23 @@ internal struct PaneChromeView: View {
             return .orange
         }
         return .green
+    }
+
+    /// The SSH host of a remote project's pane.
+    @ViewBuilder private var remoteBadge: some View {
+        if let remote = session.folder.remote {
+            HStack(spacing: Layout.branchSpacing) {
+                Image(systemName: "network")
+                    .font(.system(size: Layout.smallIconSize, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text(remote.host)
+                    .font(.system(size: Layout.detailFontSize, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .foregroundStyle(.white.opacity(Layout.branchOpacity))
+            .help("Remote project over SSH: \(remote.location)")
+        }
     }
 
     @ViewBuilder private var branchButton: some View {
@@ -138,9 +156,11 @@ internal struct PaneChromeView: View {
     }
 
     @ViewBuilder private var trailingControls: some View {
-        OpenInMenu(folder: session.folder.url)
-            .foregroundStyle(.white)
-            .tint(.white)
+        if !session.folder.isRemote {
+            OpenInMenu(folder: session.folder.url)
+                .foregroundStyle(.white)
+                .tint(.white)
+        }
 
         Button(action: onRestart) {
             Image(systemName: "arrow.clockwise")
@@ -163,10 +183,12 @@ internal struct PaneChromeView: View {
 
     private var optionsMenu: some View {
         Menu {
-            Button {
-                env.pendingGitReview = session.folder
-            } label: {
-                Label("Review Git Changes…", systemImage: "doc.text.magnifyingglass")
+            if !session.folder.isRemote {
+                Button {
+                    env.pendingGitReview = session.folder
+                } label: {
+                    Label("Review Git Changes…", systemImage: "doc.text.magnifyingglass")
+                }
             }
             Button {
                 onOpenFreshPane()

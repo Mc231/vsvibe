@@ -29,6 +29,9 @@ internal struct SessionRestorePlan: Equatable {
         /// Resumed with the project's command (best effort): no alias uses the
         /// transcript's config dir (nil when none could be derived).
         case resumedWithUnknownConfigDir(URL?)
+        /// A remote pane resuming its conversation (or starting it with the
+        /// saved id): `command` is the remote command, see `RemoteLaunch`.
+        case resumedRemote
     }
 
     /// One pane to reopen.
@@ -36,6 +39,8 @@ internal struct SessionRestorePlan: Equatable {
         internal let folder: FolderEntry
         /// Command typed into the new shell: a launch command, with
         /// `--resume <id>` when the pane's Claude conversation can be resumed.
+        /// For a remote project: the remote command (the pane itself resumes
+        /// `claudeSessionID`, see `SessionManager.restoreSession`).
         internal let command: String
         /// Conversation the pane resumes (carried to the new pane so a later
         /// relaunch resumes it again); nil when the pane starts fresh.
@@ -48,7 +53,7 @@ internal struct SessionRestorePlan: Equatable {
         internal static func launching(_ folder: FolderEntry, resolution: Resolution) -> Self {
             Self(
                 folder: folder,
-                command: folder.launchCommand,
+                command: folder.primaryCommand,
                 claudeSessionID: nil,
                 transcriptPath: nil,
                 resolution: resolution
@@ -124,6 +129,9 @@ internal struct SessionRestorePlan: Equatable {
     /// Without one, the project's command resumes unless it is a known alias
     /// without Claude hooks.
     private static func pane(for folder: FolderEntry, saved: PaneSnapshot, lookups: Lookups) -> Pane {
+        if let remote = folder.remote {
+            return remotePane(for: folder, remote: remote, saved: saved)
+        }
         let fresh = Pane.launching(folder, resolution: .launchCommand)
         guard let sessionID = saved.claudeSessionID, LaunchCommandResolver.isValidClaudeSessionID(sessionID) else {
             return fresh
@@ -143,5 +151,25 @@ internal struct SessionRestorePlan: Equatable {
         }
         let unknownDir = Resolution.resumedWithUnknownConfigDir(configDir)
         return conversation.resumingProjectCommand(lookups: lookups, resolution: unknownDir) ?? fresh
+    }
+
+    /// A remote pane's command is the remote command; it resumes the saved
+    /// conversation (`RemoteLaunch`: `--resume`, else start it with that id)
+    /// when the project runs Claude and the id is valid. The transcript is on
+    /// the remote host, so its path is neither checked nor carried.
+    private static func remotePane(for folder: FolderEntry, remote: RemoteTarget, saved: PaneSnapshot) -> Pane {
+        guard remote.launchesClaude,
+            let sessionID = saved.claudeSessionID,
+            LaunchCommandResolver.isValidClaudeSessionID(sessionID)
+        else {
+            return Pane.launching(folder, resolution: .launchCommand)
+        }
+        return Pane(
+            folder: folder,
+            command: remote.command,
+            claudeSessionID: sessionID,
+            transcriptPath: nil,
+            resolution: .resumedRemote
+        )
     }
 }

@@ -8,6 +8,8 @@ import Foundation
 internal final class FakeSessionLauncher {
     internal private(set) var spawnedFolders: [URL] = []
     internal private(set) var spawnedPaneIDs: [UUID] = []
+    /// Lines typed into the panes' shells, in order (after `commandDelay`).
+    internal private(set) var typedCommands: [String] = []
     internal var onPath: Set<String> = []
     internal let loginShellKnows: Set<String>
     internal let loginShellTimesOut: Set<String>
@@ -20,6 +22,9 @@ internal final class FakeSessionLauncher {
             spawnShell: { [weak self] _, folder, paneID in
                 self?.spawnedFolders.append(folder)
                 self?.spawnedPaneIDs.append(paneID)
+            },
+            typeCommand: { [weak self] _, command in
+                self?.typedCommands.append(command)
             },
             isOnSearchPath: { [weak self] command in
                 self?.onPath.contains(command) ?? false

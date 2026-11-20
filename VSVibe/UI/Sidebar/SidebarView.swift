@@ -77,6 +77,11 @@ internal struct SidebarView: View {
             }
             .help("New Project (⇧⌘O)")
 
+            footerButton(systemImage: "network", label: "New Remote Project") {
+                env.beginCreateRemoteProjectFlow()
+            }
+            .help("New Remote Project (SSH)")
+
             footerButton(systemImage: "minus", label: "Remove Folder") {
                 if let folder = selectedFolder {
                     env.removeFolderPermanently(id: folder.id)
@@ -211,29 +216,24 @@ internal struct SidebarView: View {
         }
         Divider()
         labelsMenu(folder)
-        Menu("Open In") {
-            ForEach(EditorRegistry.availableEditors()) { editor in
-                Button {
-                    EditorRegistry.open(folder: folder.url, with: editor)
-                } label: {
-                    Label(editor.displayName, systemImage: editor.iconSystemName)
-                }
-            }
-            if EditorRegistry.availableEditors().isEmpty {
-                Text("No supported editors detected")
-            }
+        if !folder.isRemote {
+            OpenInMenu(folder: folder.url, compact: false)
         }
         Button("Project Stats…") {
             env.showStats(folder: folder)
         }
-        Button("Review Git Changes…") {
-            env.pendingGitReview = folder
+        if !folder.isRemote {
+            Button("Review Git Changes…") {
+                env.pendingGitReview = folder
+            }
         }
         Button("Edit Project…") {
             env.beginEditProjectFlow(folder: folder)
         }
-        Button("Show in Finder") {
-            NSWorkspace.shared.activateFileViewerSelecting([folder.url])
+        if !folder.isRemote {
+            Button("Show in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting([folder.url])
+            }
         }
         Divider()
         Button("Remove Project", role: .destructive) {

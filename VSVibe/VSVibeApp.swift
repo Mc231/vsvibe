@@ -64,6 +64,9 @@ internal struct VSVibeApp: App {
                 env.beginCreateProjectFlow()
             }
             .keyboardShortcut("o", modifiers: [.command, .shift])
+            Button("New Remote Project…") {
+                env.beginCreateRemoteProjectFlow()
+            }
             Divider()
             Button("Open All Shortcuts") {
                 env.openAllShortcuts()

@@ -59,7 +59,9 @@ internal final class SessionManager {
     /// Opens a pane restored from a previous launch: `command` is typed instead
     /// of the folder's launch command (e.g. `claude --resume <id>`) and the
     /// Claude conversation id and transcript path are carried over, so a later
-    /// relaunch resumes it again. Focus is left to the caller.
+    /// relaunch resumes it again. For a remote project `command` is the remote
+    /// command and the pane resumes `claudeSessionID` (or starts it when it
+    /// never began). Focus is left to the caller.
     @discardableResult
     internal func restoreSession(
         for folder: FolderEntry,
@@ -67,9 +69,13 @@ internal final class SessionManager {
         claudeSessionID: String?,
         transcriptPath: String? = nil
     ) -> TerminalSession {
-        let session = makeSession(for: folder, commandOverride: command)
-        recordClaudeConversation(claudeSessionID, transcriptPath: transcriptPath, in: session)
-        return session
+        guard folder.isRemote else {
+            let session = makeSession(for: folder, commandOverride: command)
+            recordClaudeConversation(claudeSessionID, transcriptPath: transcriptPath, in: session)
+            return session
+        }
+        // A remote pane resumes `claudeSessionID` itself (`RemoteLaunch`).
+        return makeSession(for: folder, commandOverride: command, resumeClaudeSessionID: claudeSessionID)
     }
 
     /// Records the Claude conversation running in `session` (from its hook
@@ -83,7 +89,9 @@ internal final class SessionManager {
     ) {
         session.claudeSessionID = claudeSessionID
         session.claudeTranscriptPath = transcriptPath
-        if sessions.contains(where: { $0.id == session.id }) {
+        // Remote transcripts are on the remote host: no local usage tracking
+        // (remote usage would plug in here).
+        if !session.folder.isRemote, sessions.contains(where: { $0.id == session.id }) {
             usageTracking.refresh(session)
         }
     }
@@ -162,10 +170,16 @@ internal final class SessionManager {
         }
     }
 
-    /// Creates a session. When `commandOverride` is provided it is injected into
-    /// the shell instead of `folder.launchCommand` (e.g. to resume the most
-    /// recent session via `claude --continue`).
-    private func makeSession(for folder: FolderEntry, commandOverride: String? = nil) -> TerminalSession {
+    /// Creates a session. When `commandOverride` is provided it runs instead
+    /// of the project's command (`primaryCommand`: the local launch command,
+    /// or the remote command), e.g. to resume the most recent session via
+    /// `claude --continue`. `resumeClaudeSessionID` only applies to remote
+    /// projects (see `launchRemote`).
+    private func makeSession(
+        for folder: FolderEntry,
+        commandOverride: String? = nil,
+        resumeClaudeSessionID: String? = nil
+    ) -> TerminalSession {
         let terminalView = launcher.makeTerminalView()
         let session = TerminalSession(folder: folder, terminalView: terminalView)
 
@@ -183,19 +197,71 @@ internal final class SessionManager {
         openedAt[session.id] = Date()
         statsStore.recordPaneOpened(folderURL: folder.url)
 
-        launcher.spawnShell(terminalView, folder.url, session.id)
-
-        // Inject launch command after the shell has initialized.
-        let command = commandOverride ?? folder.launchCommand
-        DispatchQueue.main.asyncAfter(deadline: .now() + launcher.commandDelay) { [weak terminalView] in
-            terminalView?.injectCommand(command)
+        if let remote = folder.remote {
+            launchRemote(
+                remote,
+                in: session,
+                commandOverride: commandOverride,
+                resumeClaudeSessionID: resumeClaudeSessionID
+            )
+        } else {
+            launchLocal(in: session, command: commandOverride ?? folder.launchCommand)
         }
+        return session
+    }
 
+    /// Starts the login shell in the project folder, types `command` once the
+    /// shell is up and starts the usage / git trackers.
+    private func launchLocal(in session: TerminalSession, command: String) {
+        let folder = session.folder
+        launcher.spawnShell(session.terminalView, folder.url, session.id)
+        type(command, into: session)
         verifyLaunchCommand(LaunchCommandResolver.baseCommand(of: command), for: session)
         startTrackers(for: session, command: command)
-
         Log.session.info("Spawned session for \(folder.url.path, privacy: .public) cmd=\(command, privacy: .public)")
-        return session
+    }
+
+    /// Starts the login shell in the user's home and types the `ssh` line
+    /// (`SSHCommand`) that runs the remote command in the remote folder. The
+    /// Claude conversation id `RemoteLaunch` chose is recorded right away, so
+    /// it is saved for restore without hooks. No local git / usage tracking:
+    /// the folder and transcripts are on the remote host. An invalid target
+    /// (e.g. a hand-edited state.json) types nothing and says why instead.
+    private func launchRemote(
+        _ remote: RemoteTarget,
+        in session: TerminalSession,
+        commandOverride: String?,
+        resumeClaudeSessionID: String?
+    ) {
+        launcher.spawnShell(session.terminalView, FileManager.default.homeDirectoryForCurrentUser, session.id)
+        let plan = RemoteLaunch.plan(
+            for: remote,
+            newClaudeSessionID: UUID(),
+            commandOverride: commandOverride,
+            resumeClaudeSessionID: resumeClaudeSessionID
+        )
+        switch SSHCommand.line(for: remote, paneID: session.id, invocation: plan.invocation) {
+        case .success(let line):
+            type(line, into: session)
+            recordClaudeConversation(plan.claudeSessionID, transcriptPath: nil, in: session)
+            verifyLaunchCommand(SSHCommand.executable, for: session)
+            Log.session.info("Spawned remote session for \(remote.location, privacy: .public)")
+
+        case .failure(let error):
+            session.errorMessage = "Can't open \(remote.location): \(error.message) Edit the project to fix it."
+            Log.session.error("Invalid remote project \(session.folder.id.uuidString, privacy: .public)")
+        }
+    }
+
+    /// Types `command` into the pane's shell once it has initialized.
+    private func type(_ command: String, into session: TerminalSession) {
+        let typeCommand = launcher.typeCommand
+        let terminalView = session.terminalView
+        DispatchQueue.main.asyncAfter(deadline: .now() + launcher.commandDelay) { [weak terminalView] in
+            if let terminalView {
+                typeCommand(terminalView, command)
+            }
+        }
     }
 
     private func startTrackers(for session: TerminalSession, command: String) {

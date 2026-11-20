@@ -55,7 +55,7 @@ internal final class SessionRestoreController {
 
     /// Explains the panes that did not resume the way their project command would.
     private static func log(_ pane: SessionRestorePlan.Pane) {
-        let folder = pane.folder.url.path
+        let folder = pane.folder.locationDescription
         switch pane.resolution {
         case .transcriptMissing:
             Log.session.info("Not resuming in \(folder, privacy: .public): the conversation's transcript is gone")
@@ -68,6 +68,9 @@ internal final class SessionRestoreController {
 
         case .resumedWithOwningAlias(let command):
             Log.session.info("Resuming in \(folder, privacy: .public) with alias \(command, privacy: .public)")
+
+        case .resumedRemote:
+            Log.session.info("Resuming the remote conversation in \(folder, privacy: .public)")
 
         case .launchCommand, .resumedWithProjectCommand:
             break

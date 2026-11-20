@@ -20,11 +20,12 @@ internal final class AppEnvironment {
     internal var pendingStats: FolderEntry?
     internal var pendingGitReview: FolderEntry?
 
-    /// Folder URL of the currently focused pane, if any.
+    /// Local folder of the currently focused pane, if any (nil for a remote project).
     internal var focusedFolderURL: URL? {
         guard
             let id = sessionManager.focusedSessionID,
-            let session = sessionManager.sessions.first(where: { $0.id == id })
+            let session = sessionManager.sessions.first(where: { $0.id == id }),
+            !session.folder.isRemote
         else {
             return nil
         }
@@ -86,6 +87,11 @@ internal final class AppEnvironment {
         }
     }
 
+    /// Launch the "create remote project" flow: the editor sheet with SSH fields.
+    internal func beginCreateRemoteProjectFlow() {
+        pendingEditor = .createRemote
+    }
+
     internal func beginEditProjectFlow(folder: FolderEntry) {
         pendingEditor = .edit(folder: folder)
     }
@@ -96,20 +102,21 @@ internal final class AppEnvironment {
 
     internal func commitEditor(mode: ProjectEditorMode, result: ProjectEditorResult) {
         switch mode {
-        case .create(let url):
-            createProject(
-                url: url,
+        case .create, .createRemote:
+            let entry = folderStore.createProject(
                 name: result.name,
-                launchCommand: result.launchCommand,
-                openImmediately: result.openImmediately,
+                location: result.location,
                 labelIDs: result.labelIDs
             )
+            if result.openImmediately {
+                sessionManager.ensureSession(for: entry)
+            }
 
         case .edit(let folder):
             updateProject(
                 id: folder.id,
                 name: result.name,
-                launchCommand: result.launchCommand,
+                location: result.location,
                 labelIDs: result.labelIDs
             )
         }
@@ -171,46 +178,21 @@ internal final class AppEnvironment {
         }
     }
 
-    /// Creates a new project (shortcut) with explicit name and launch command.
-    /// Optionally opens its pane right away.
-    @discardableResult
-    internal func createProject(
-        url: URL,
-        name: String,
-        launchCommand: String,
-        openImmediately: Bool,
-        labelIDs: [ProjectLabel.ID] = []
-    ) -> FolderEntry {
-        let entry = folderStore.createProject(
-            url: url,
-            name: name,
-            launchCommand: launchCommand,
-            labelIDs: labelIDs
-        )
-        if openImmediately {
-            sessionManager.ensureSession(for: entry)
-        }
-        return entry
-    }
-
-    /// Updates an existing project's name, launch command and labels.
-    /// If the launch command changes while a pane is running, restart the pane.
+    /// Updates an existing project's name, location (launch command / remote
+    /// target) and labels. If what a pane runs changes while one is running,
+    /// restart the project's panes.
     internal func updateProject(
         id: FolderEntry.ID,
         name: String,
-        launchCommand: String,
+        location: ProjectLocation,
         labelIDs: [ProjectLabel.ID]
     ) {
         let previous = folderStore.folders.first { $0.id == id }
-        folderStore.updateProject(id: id, name: name, launchCommand: launchCommand, labelIDs: labelIDs)
-        guard let prev = previous else {
+        folderStore.updateProject(id: id, name: name, location: location, labelIDs: labelIDs)
+        guard let prev = previous, let updated = folderStore.folders.first(where: { $0.id == id }) else {
             return
         }
-        let commandChanged = prev.launchCommand.trimmingCharacters(in: .whitespacesAndNewlines)
-            != launchCommand.trimmingCharacters(in: .whitespacesAndNewlines)
-        if commandChanged,
-            sessionManager.hasSession(forFolder: id),
-            let updated = folderStore.folders.first(where: { $0.id == id }) {
+        if updated.launchesDifferently(than: prev), sessionManager.hasSession(forFolder: id) {
             sessionManager.closeAllSessions(forFolder: id)
             sessionManager.ensureSession(for: updated)
         }
@@ -244,7 +226,7 @@ internal final class AppEnvironment {
         if let existing = sessionManager.firstSession(forFolder: folder.id) {
             sessionManager.focus(id: existing.id)
         } else {
-            let command = LaunchCommandResolver.continueCommand(for: folder.launchCommand)
+            let command = LaunchCommandResolver.continueCommand(for: folder.primaryCommand)
             sessionManager.ensureSession(for: folder, commandOverride: command)
         }
     }
