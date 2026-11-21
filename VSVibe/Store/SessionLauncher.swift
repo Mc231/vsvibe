@@ -44,7 +44,7 @@ internal struct SessionLauncher {
 
     internal static func makeTerminalView() -> LocalProcessTerminalView {
         let frame = NSRect(x: 0, y: 0, width: Constants.initialWidth, height: Constants.initialHeight)
-        let view = LocalProcessTerminalView(frame: frame)
+        let view = PaneTerminalView(frame: frame)
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }
