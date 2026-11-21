@@ -10,10 +10,12 @@ is missing.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-21
+
 ### Added
 
-- Install with Homebrew: `brew install --cask mc231/tap/vsvibe`. Every release
-  now updates the cask in the `Mc231/homebrew-tap` tap automatically.
+- Install with Homebrew: `brew install --cask mc231/tap/vsvibe`. Each new
+  release is available there automatically.
 
 ### Fixed
 

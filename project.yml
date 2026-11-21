@@ -20,7 +20,7 @@ settings:
     # Local/dev defaults. Release builds override both from the tag
     # (scripts/build-dmg.sh): MARKETING_VERSION = tag minus "v",
     # CURRENT_PROJECT_VERSION = `git rev-list --count HEAD` (Sparkle compares it).
-    MARKETING_VERSION: "0.3.0"
+    MARKETING_VERSION: "0.3.1"
     CURRENT_PROJECT_VERSION: "1"
 
 packages:
