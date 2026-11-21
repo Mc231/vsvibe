@@ -6,6 +6,18 @@
     <description>VSVibe updates</description>
     <language>en</language>
     <item>
+      <title>Version 0.3.1</title>
+      <pubDate>Sat, 21 Nov 2026 10:07:15 GMT</pubDate>
+      <sparkle:version>41</sparkle:version>
+      <sparkle:shortVersionString>0.3.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;Added&lt;/h3&gt;
+&lt;ul&gt;&lt;li&gt;Install with Homebrew: &lt;code&gt;brew install --cask mc231/tap/vsvibe&lt;/code&gt;. Each new release is available there automatically.&lt;/li&gt;&lt;/ul&gt;
+&lt;h3&gt;Fixed&lt;/h3&gt;
+&lt;ul&gt;&lt;li&gt;Copying text from a pane running Claude Code: Claude tracks the mouse, so a plain drag never selected anything. Hold &lt;strong&gt;Option&lt;/strong&gt; while dragging to select (as in iTerm), then ⌘C. Right-click a pane for Copy / Paste / Select All.&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/Mc231/vsvibe/releases/download/v0.3.1/VSVibe-0.3.1.dmg" length="4920344" type="application/octet-stream" sparkle:edSignature="RljtEnm0LZC5k+3NUqP94NnBhLCPsm5Z6pcNyPy1gYrhAXngnUwMSdBFIgPYtB1mBgxxJXr+hZ7SAZvrWnhoCA==" />
+    </item>
+    <item>
       <title>Version 0.3.0</title>
       <pubDate>Fri, 20 Nov 2026 08:36:46 GMT</pubDate>
       <sparkle:version>37</sparkle:version>
