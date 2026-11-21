@@ -164,14 +164,19 @@ brew uninstall --cask vsvibe           # --zap also removes settings and data
   git -C "$SCRATCH/tap" commit -am "vsvibe X.Y.Z" && git -C "$SCRATCH/tap" push
   ```
 
-- **Checking the cask:** `brew update && brew fetch --cask mc231/tap/vsvibe`
-  downloads the DMG and verifies the sha256. Homebrew 7 **refuses to *load* casks
-  from untrusted taps** for `brew info`, `audit` and `livecheck`. Installing by
-  the full name (`mc231/tap/vsvibe`) and `fetch` still work, so users are not
-  affected. For the other commands, run `brew trust --tap mc231/tap` once, then
-  `brew info --cask`, `brew audit --cask --online` (without `--new`; `--new`
-  adds the official-repo notability rule, which fails), `brew livecheck --cask`
-  and `brew style`. To test a real install without touching
+- **Checking the cask:** Homebrew 7 **refuses to load casks from untrusted
+  taps** for `brew info`, `fetch`, `audit` and `livecheck`. `brew install --cask
+  mc231/tap/vsvibe` works without trust, so users are not affected (verified
+  2026-11-21). This Mac trusts the tap (`brew trust --tap mc231/tap`, stored in
+  `~/.homebrew/trust.json`). If a check says "untrusted tap", run that command
+  again. Then use:
+  - `brew update && brew fetch --cask mc231/tap/vsvibe`, which downloads the DMG
+    and verifies its sha256;
+  - `brew info --cask`;
+  - `brew audit --cask --online`, without `--new`: `--new` adds the
+    official-repo notability rule, which fails;
+  - `brew livecheck --cask`;
+  - `brew style`. To test a real install without touching
   `/Applications`, run
   `brew install --cask --appdir="$SCRATCH/apps" mc231/tap/vsvibe`, then
   `brew uninstall --cask mc231/tap/vsvibe`. A plain install refuses when
