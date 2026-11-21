@@ -10,9 +10,11 @@ Gitea pull-mirrors GitHub and runs `.gitea/workflows/release.yml` on the
 self-hosted macOS runner: tests, Developer ID signing, notarization, stapling,
 Sparkle EdDSA signature, GitHub Release with the DMG, and a new `<item>` in
 `appcast.xml` on `gh-pages` (served by GitHub Pages at
-`https://mc231.github.io/vsvibe/appcast.xml`). Installed copies pick it up via
-Sparkle. Background: `docs/auto-update-and-releases.md`; one-time setup:
-`scripts/NOTARIZE.md`.
+`https://mc231.github.io/vsvibe/appcast.xml`), and the Homebrew cask in
+`Mc231/homebrew-tap` (`brew install --cask mc231/tap/vsvibe`). Installed copies
+pick it up via Sparkle. Background: `docs/auto-update-and-releases.md`; map of
+CI, release, update and distribution pieces: `docs/distribution-and-ci.md`;
+one-time setup: `scripts/NOTARIZE.md`.
 
 **Pushing to `main` and pushing a tag are outward-facing: get the user's OK
 for the version before pushing the tag.** A published version is final.
@@ -131,6 +133,11 @@ for the version before pushing the tag.** A published version is final.
    `curl -sIL -o /dev/null -w '%{http_code}\n' https://github.com/Mc231/vsvibe/releases/latest/download/VSVibe.dmg`
    (200; the release must have both `VSVibe-X.Y.Z.dmg` and `VSVibe.dmg`).
 
+   And the Homebrew tap: `gh api repos/Mc231/homebrew-tap/contents/Casks/vsvibe.rb --jq .content | base64 -d | head -3`
+   must show `version "X.Y.Z"` and the sha256 of `VSVibe-X.Y.Z.dmg`
+   (`shasum -a 256 "$D/v.dmg"`); `brew update && brew fetch --cask mc231/tap/vsvibe`
+   then prints `✔︎ Cask vsvibe (X.Y.Z)`.
+
    Expected: `source=Notarized Developer ID`, stapler OK, version `X.Y.Z`, build
    = commit count, and the appcast's newest item matches. GitHub Pages can take
    a minute or two to serve the new appcast.
@@ -146,6 +153,7 @@ for the version before pushing the tag.** A published version is final.
 | "no Developer ID identity" / import fails | `DEVELOPER_ID_P12_*` secrets wrong or the certificate expired (2027-12-14). New certificate: CSR → developer.apple.com (Account Holder only; the API refuses) → new `.p12` → update both secrets and `~/pet/secure/vsvibe/`. |
 | Notarization `Invalid` | Read the log: `xcrun notarytool log <id> --key … --key-id … --issuer …`. Usually an unsigned nested binary or missing hardened runtime: fix `scripts/build-dmg.sh` (inside-out signing) and reproduce locally with step 4's notarized build. |
 | GitHub Release or `gh-pages` push fails | `GH_RELEASE_TOKEN` expired or lacks Contents: write. Re-run the job from the Gitea UI after fixing: the release step re-uploads with `--clobber` and the appcast update is idempotent. |
+| "Update the Homebrew tap" fails | `GH_RELEASE_TOKEN` can't push to `Mc231/homebrew-tap` (fine-grained token without that repo, or expired). The GitHub Release and appcast are already out; fix the token and re-run the job (every step is idempotent), or update the cask by hand with `python3 tools/homebrew_cask.py --version X.Y.Z --dmg VSVibe-X.Y.Z.dmg --out <tap>/Casks/vsvibe.rb`. |
 | App doesn't offer the update | Check the appcast URL serves the new item, that its `sparkle:version` (build) is higher than the installed build, and the installed app's `SUFeedURL`. EdDSA mismatch means `SPARKLE_ED_PRIVATE_KEY` doesn't match `SUPublicEDKey` in `project.yml`: never rotate that key, installed apps can't follow. |
 | Run stuck in `queued` | Runner busy with other repos (`grep 'repo is' ~/gitea/act_runner/runner.err | tail`). Wait. |
 

@@ -10,6 +10,17 @@ is missing.
 
 ## [Unreleased]
 
+### Added
+
+- Install with Homebrew: `brew install --cask mc231/tap/vsvibe`. Every release
+  now updates the cask in the `Mc231/homebrew-tap` tap automatically.
+
+### Fixed
+
+- Copying text from a pane running Claude Code: Claude tracks the mouse, so a
+  plain drag never selected anything. Hold **Option** while dragging to select
+  (as in iTerm), then ⌘C. Right-click a pane for Copy / Paste / Select All.
+
 ## [0.3.0] - 2026-11-20
 
 ### Added

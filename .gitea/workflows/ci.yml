@@ -45,7 +45,7 @@ jobs:
             -ignore 'the runner of "actions/upload-artifact@v3" action is too old' \
             .gitea/workflows/*.yml
 
-      - name: Release tool tests (appcast + CHANGELOG)
+      - name: Release tool tests (appcast, CHANGELOG, Homebrew cask)
         run: python3 -I -m unittest discover -s tools -p 'test_*.py'
 
       - name: gitleaks (pushed commit)

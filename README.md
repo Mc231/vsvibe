@@ -7,11 +7,24 @@ token usage and hook activity, and keeps persistent per-project statistics.
 
 Requires macOS 15.0 or later.
 
+## Install
+
+```sh
+brew install --cask mc231/tap/vsvibe
+```
+
+Or download the notarized DMG:
+[VSVibe.dmg](https://github.com/Mc231/vsvibe/releases/latest/download/VSVibe.dmg)
+(always the latest release). VSVibe updates itself; see
+[vshyrochuk.com/vsvibe](https://vshyrochuk.com/vsvibe/).
+
 ## Features
 
 - **Multiple panes per project** — open as many terminal panes as you like for
   each project folder, tiled in a grid. Terminals are powered by
-  [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm).
+  [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm). Claude Code
+  captures the mouse, so hold **Option** while dragging to select text (then
+  ⌘C); right-click a pane for Copy / Paste / Select All.
 - **Project sidebar with labels** — group projects under one or more labels;
   the sidebar renders a collapsible section per label plus an "Ungrouped"
   bucket.
@@ -105,6 +118,9 @@ notarization setup.
 - [Auto-update and releases](docs/auto-update-and-releases.md): Sparkle 2
   updates (Settings → Updates, "Check for Updates…") and the notarized release
   pipeline triggered by a `vX.Y.Z` tag.
+- [Distribution, CI and updates](docs/distribution-and-ci.md): the map of CI,
+  Sonar, releases, Sparkle, the Homebrew tap and the website, with runbooks
+  and known gotchas.
 
 ## Project layout
 

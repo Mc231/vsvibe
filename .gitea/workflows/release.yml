@@ -8,7 +8,9 @@ name: Release (notarized DMG, GitHub Release, Sparkle appcast)
 #   3. signs the DMG for Sparkle (EdDSA), creates the GitHub Release with the
 #      DMG and the CHANGELOG section as notes;
 #   4. adds the version to appcast.xml on the `gh-pages` branch of GitHub
-#      (https://mc231.github.io/vsvibe/appcast.xml).
+#      (https://mc231.github.io/vsvibe/appcast.xml);
+#   5. writes Casks/vsvibe.rb (version + DMG sha256) to the Homebrew tap
+#      github.com/Mc231/homebrew-tap (`brew install --cask mc231/tap/vsvibe`).
 # It never pushes to `main` nor to the Gitea mirror.
 #
 # Secrets (one-time owner setup, scripts/NOTARIZE.md):
@@ -16,6 +18,7 @@ name: Release (notarized DMG, GitHub Release, Sparkle appcast)
 #   ASC_API_KEY_ID, ASC_API_ISSUER_ID, ASC_API_KEY_P8_BASE64   notarytool API key
 #   SPARKLE_ED_PRIVATE_KEY   Sparkle EdDSA private key (generate_keys -x output)
 #   GH_RELEASE_TOKEN         fine-grained PAT, Contents: write on Mc231/vsvibe
+#                            and Mc231/homebrew-tap
 #
 # Every key file lives under $RUNNER_TEMP (never /tmp) and is removed by the
 # always-run cleanup step, together with the temporary keychain.
@@ -32,6 +35,7 @@ defaults:
 env:
   GITHUB_REPO: Mc231/vsvibe
   APPCAST_URL: https://mc231.github.io/vsvibe/appcast.xml
+  TAP_REPO: Mc231/homebrew-tap
 
 jobs:
   release:
@@ -249,6 +253,36 @@ jobs:
           git_gh -C "$pages" push "$remote" HEAD:refs/heads/gh-pages
           echo "Published $VERSION to $APPCAST_URL"
 
+      - name: Update the Homebrew tap
+        env:
+          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          DMG: ${{ steps.version.outputs.dmg }}
+        run: |
+          set -euo pipefail
+          remote="https://github.com/$TAP_REPO.git"
+          tap="$RUNNER_TEMP/homebrew-tap"
+          rm -rf "$tap"
+          # Same header-only token handling as the appcast step.
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::$auth"
+          git_gh() {
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" "$@"
+          }
+          git_gh clone --quiet --depth 1 "$remote" "$tap"
+          python3 -I tools/homebrew_cask.py --version "$VERSION" --dmg "$DMG" --out "$tap/Casks/vsvibe.rb"
+          git -C "$tap" add Casks/vsvibe.rb
+          if git -C "$tap" diff --cached --quiet; then
+            echo "tap already has VSVibe $VERSION"
+            exit 0
+          fi
+          git -C "$tap" \
+            -c user.name="VSVibe Release" \
+            -c user.email="vsvibe-release@users.noreply.github.com" \
+            commit --quiet -m "vsvibe $VERSION"
+          git_gh -C "$tap" push "$remote" HEAD:refs/heads/main
+          echo "Published VSVibe $VERSION to $TAP_REPO"
+
       - name: Clean up keychain and key files
         if: ${{ always() }}
         run: |
@@ -269,4 +303,4 @@ jobs:
               rm -P "$RUNNER_TEMP/$file"
             fi
           done
-          rm -rf "$RUNNER_TEMP/gh-pages" "$RUNNER_TEMP/release-notes.md"
+          rm -rf "$RUNNER_TEMP/gh-pages" "$RUNNER_TEMP/homebrew-tap" "$RUNNER_TEMP/release-notes.md"

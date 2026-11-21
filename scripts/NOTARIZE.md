@@ -52,8 +52,9 @@ mode 600).
 ## 4. GitHub token
 
 github.com → Settings → Developer settings → **Fine-grained token**, resource
-owner Mc231, repository **Mc231/vsvibe** only, permission **Contents: Read and
-write** (creates releases, uploads the DMG, pushes `gh-pages`). Pick an
+owner Mc231, repositories **Mc231/vsvibe** and **Mc231/homebrew-tap**,
+permission **Contents: Read and write** (creates releases, uploads the DMG,
+pushes `gh-pages` and the Homebrew cask). Pick an
 expiry and put a reminder to rotate it.
 
 ## 5. Gitea secrets (repository `vsvibe` → Settings → Actions → Secrets)

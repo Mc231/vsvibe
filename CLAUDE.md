@@ -192,11 +192,15 @@ verification, failure table). In short: add a `## [X.Y.Z]` section to `CHANGELOG
 push `main` and the tag `vX.Y.Z` to GitHub. `release.yml` tests, signs with
 Developer ID from a temporary keychain, notarizes with the App Store Connect API
 key, staples, signs the DMG for Sparkle, creates the GitHub Release and updates
-the appcast. `tools/appcast.py` (tested by `tools/test_appcast.py`) builds notes
-and the appcast; `scripts/sparkle-tool.sh` finds Sparkle's CLI tools. Never
+the appcast, then writes the Homebrew cask (`tools/homebrew_cask.py`, tested by
+`tools/test_homebrew_cask.py`) to the tap `Mc231/homebrew-tap`
+(`brew install --cask mc231/tap/vsvibe`). `tools/appcast.py` (tested by
+`tools/test_appcast.py`) builds notes and the appcast; `scripts/sparkle-tool.sh` finds Sparkle's CLI tools. Never
 commit the Sparkle private key (`.secrets/`, Gitea secret
 `SPARKLE_ED_PRIVATE_KEY`). One-time setup: `scripts/NOTARIZE.md`. Details:
-`docs/auto-update-and-releases.md`.
+`docs/auto-update-and-releases.md`. Map of every CI / release / update /
+Homebrew / website piece, with runbooks and gotchas: `docs/distribution-and-ci.md`
+(read it before investigating any of those).
 
 ## Testing rule
 

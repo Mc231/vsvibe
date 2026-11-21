@@ -3,7 +3,12 @@
 VSVibe updates itself with **Sparkle 2** (Swift Package). Releases are built by
 Gitea Actions from a `vX.Y.Z` tag: a Developer ID signed, notarized and stapled
 DMG is published as a GitHub Release asset, and an entry is added to the Sparkle
-appcast at `https://mc231.github.io/vsvibe/appcast.xml` (`gh-pages` branch).
+appcast at `https://mc231.github.io/vsvibe/appcast.xml` (`gh-pages` branch),
+and the Homebrew cask in [`Mc231/homebrew-tap`](https://github.com/Mc231/homebrew-tap)
+is bumped to the new version.
+
+The big picture (CI, Sonar, release, Sparkle, Homebrew, landing page, and the
+runbooks) is in [distribution-and-ci.md](distribution-and-ci.md).
 
 One-time owner setup (certificate export, API key, Sparkle key, token, Pages):
 [`scripts/NOTARIZE.md`](../scripts/NOTARIZE.md).
@@ -85,6 +90,8 @@ flowchart TD
     J --> K[appcast.py update, push gh-pages]
     K --> L[GitHub Pages serves appcast.xml]
     L --> M[installed apps see the update]
+    K --> N[homebrew_cask.py, push Mc231/homebrew-tap]
+    N --> O[brew install --cask mc231/tap/vsvibe gets X.Y.Z]
     B -.always.-> Z[cleanup: keychain, key files]
 ```
 
@@ -131,7 +138,12 @@ flowchart TD
    first; a re-run replaces the item and keeps its `pubDate`), adds
    `.nojekyll`, commits and pushes. The token is passed as an HTTP header, never
    stored in a remote URL or `.git/config`. `ci.yml` ignores `gh-pages`.
-10. **Cleanup** (always): restores the keychain search list, deletes the
+10. **Homebrew tap.** Shallow-clones `Mc231/homebrew-tap`, writes
+    `Casks/vsvibe.rb` with `tools/homebrew_cask.py --version X.Y.Z --dmg …`
+    (version + SHA-256 of `VSVibe-X.Y.Z.dmg`; the rest of the cask is fixed in
+    the script's template), commits "vsvibe X.Y.Z" and pushes `main`. A re-run
+    with an identical cask is a no-op. Same header-only token handling.
+11. **Cleanup** (always): restores the keychain search list, deletes the
     temporary keychain, securely removes the `.p12`, `.p8` and Sparkle key.
 
 ## How to cut a release
@@ -145,8 +157,9 @@ flowchart TD
 - [ ] `git tag vX.Y.Z && git push origin vX.Y.Z`.
 - [ ] Watch the "Release" run in Gitea (the mirror syncs every 10 min, or sync
       it manually).
-- [ ] Check the GitHub Release and that
-      `https://mc231.github.io/vsvibe/appcast.xml` lists the version.
+- [ ] Check the GitHub Release, that
+      `https://mc231.github.io/vsvibe/appcast.xml` lists the version, and that
+      `Mc231/homebrew-tap`'s `Casks/vsvibe.rb` has `version "X.Y.Z"`.
 
 Re-running the workflow for the same tag is safe.
 
@@ -163,7 +176,7 @@ committed; how to produce each one is in `scripts/NOTARIZE.md`.
 | `ASC_API_ISSUER_ID` | App Store Connect issuer id, for `notarytool`. |
 | `ASC_API_KEY_P8_BASE64` | App Store Connect API private key (`.p8`, base64). |
 | `SPARKLE_ED_PRIVATE_KEY` | Sparkle EdDSA private key; signs each DMG for the appcast. |
-| `GH_RELEASE_TOKEN` | Fine-grained GitHub token, Contents read/write on `Mc231/vsvibe`: creates releases, uploads DMGs, pushes `gh-pages`. |
+| `GH_RELEASE_TOKEN` | Fine-grained GitHub token, Contents read/write on `Mc231/vsvibe` and `Mc231/homebrew-tap`: creates releases, uploads DMGs, pushes `gh-pages` and the cask. |
 
 - **Backups** of the certificate, API key and Sparkle key live in the owner's
   `~/pet/secure/vsvibe/`. The local `.secrets/` directory is git-ignored and
@@ -193,3 +206,5 @@ committed; how to produce each one is in `scripts/NOTARIZE.md`.
 | App reports an update but refuses it ("improperly signed" / signature mismatch) | `SPARKLE_ED_PRIVATE_KEY` does not match `SUPublicEDKey` in the installed build, or the DMG was replaced after signing. Restore the original key from the backup and re-run the release. Never change `SUPublicEDKey` casually. |
 | App never sees new versions | Check `https://mc231.github.io/vsvibe/appcast.xml` loads. Pages must be enabled (Settings → Pages → branch `gh-pages`, `/`), which requires the repository to be public on a free plan. Check the item's `sparkle:version` is larger than the installed `CFBundleVersion`. |
 | Appcast push fails | `GH_RELEASE_TOKEN` expired or lacks Contents: write. |
+| "Update the Homebrew tap" fails (403 / not found) | The token has no access to `Mc231/homebrew-tap` (a fine-grained token limited to selected repositories must list it) or expired. Release and appcast are already published; fix the token and re-run. |
+| `brew install` fails with "SHA256 mismatch" | The DMG asset was replaced after the cask was written. Re-run the release job (it rewrites the cask from the uploaded DMG). |
