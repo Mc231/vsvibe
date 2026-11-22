@@ -10,6 +10,15 @@ is missing.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-22
+
+### Fixed
+
+- Copying from a pane running Claude (locally or over ssh): an Option-drag
+  selection disappeared as soon as Claude redrew the screen, so Copy stayed
+  disabled. The selection now stays until you click in the pane or type, and
+  ⌘C, the right-click Copy and Select All work on it.
+
 ## [0.3.1] - 2026-11-21
 
 ### Added

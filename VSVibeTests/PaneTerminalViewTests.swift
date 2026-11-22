@@ -33,18 +33,55 @@ internal final class PaneTerminalViewTests: XCTestCase {
         XCTAssertTrue(SessionLauncher.makeTerminalView() is PaneTerminalView)
     }
 
-    internal func testOptionClickTurnsMouseReportingOffUntilAfterMouseUp() async throws {
+    private func keyEvent(_ characters: String, command: Bool = false, window: NSWindow? = nil) throws -> NSEvent {
+        try XCTUnwrap(
+            NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: command ? [.command] : [],
+                timestamp: 0,
+                windowNumber: window?.windowNumber ?? 0,
+                context: nil,
+                characters: characters,
+                charactersIgnoringModifiers: characters,
+                isARepeat: false,
+                keyCode: 0
+            )
+        )
+    }
+
+    internal func testAnOptionDragSelectionSurvivesOutputUntilThePlainClick() async throws {
+        let view = makeView()
+        view.feed(text: "line one\r\n")
+
+        view.handleMouseEvent(try mouseEvent(.leftMouseDown, option: true))
+        view.selectAll(nil)
+        view.handleMouseEvent(try mouseEvent(.leftMouseUp, option: false))
+        await AsyncWait.drainMainQueue()
+        view.feed(text: "Claude redraws\r\nmore output\r\n")
+        await AsyncWait.drainMainQueue()
+
+        XCTAssertFalse(view.allowMouseReporting)
+        XCTAssertTrue(view.isHoldingSelection)
+        XCTAssertTrue(view.selectionActive, "new output must not wipe the selection")
+
+        view.handleMouseEvent(try mouseEvent(.leftMouseDown, option: false))
+        XCTAssertTrue(view.allowMouseReporting)
+        XCTAssertFalse(view.isHoldingSelection)
+        XCTAssertFalse(view.selectionActive)
+    }
+
+    internal func testAnOptionClickWithoutADragGivesTheMouseBack() async throws {
         let view = makeView()
 
         view.handleMouseEvent(try mouseEvent(.leftMouseDown, option: true))
         XCTAssertFalse(view.allowMouseReporting)
-        XCTAssertTrue(view.isSelectingOverMouseTracking)
-
         view.handleMouseEvent(try mouseEvent(.leftMouseUp, option: false))
         XCTAssertFalse(view.allowMouseReporting, "the view still has to handle this mouse-up")
         await AsyncWait.drainMainQueue()
+
         XCTAssertTrue(view.allowMouseReporting)
-        XCTAssertFalse(view.isSelectingOverMouseTracking)
+        XCTAssertFalse(view.isHoldingSelection)
     }
 
     internal func testPlainAndOutsideClicksKeepMouseReporting() throws {
@@ -56,7 +93,35 @@ internal final class PaneTerminalViewTests: XCTestCase {
         view.handleMouseEvent(try mouseEvent(.rightMouseDown, option: true))
 
         XCTAssertTrue(view.allowMouseReporting)
-        XCTAssertFalse(view.isSelectingOverMouseTracking)
+        XCTAssertFalse(view.isHoldingSelection)
+    }
+
+    internal func testKeysOfTheFocusedPane() throws {
+        let view = makeView()
+        let window = makeWindow()
+        window.contentView?.addSubview(view)
+        XCTAssertTrue(window.makeFirstResponder(view))
+        defer {
+            view.removeFromSuperview()
+        }
+
+        view.handleKeyEvent(try keyEvent("a", command: true, window: window))
+        XCTAssertTrue(view.isHoldingSelection, "⌘A selects everything and holds it")
+        view.handleKeyEvent(try keyEvent("c", command: true, window: window))
+        XCTAssertTrue(view.isHoldingSelection, "⌘C copies and keeps the selection")
+        view.handleKeyEvent(try keyEvent("x", window: window))
+        XCTAssertFalse(view.isHoldingSelection, "typing goes back to the program")
+        XCTAssertTrue(view.allowMouseReporting)
+        view.handleKeyEvent(try keyEvent("y", window: window))
+        XCTAssertTrue(view.allowMouseReporting)
+    }
+
+    internal func testKeysOfAnotherViewAreIgnored() throws {
+        let view = makeView()
+
+        view.handleKeyEvent(try keyEvent("a", command: true))
+
+        XCTAssertFalse(view.isHoldingSelection)
     }
 
     private func makeWindow() -> NSWindow {
@@ -64,7 +129,7 @@ internal final class PaneTerminalViewTests: XCTestCase {
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 200),
             styleMask: [.titled],
             backing: .buffered,
-            defer: true
+            defer: false
         )
         window.isReleasedWhenClosed = false
         return window
@@ -95,7 +160,7 @@ internal final class PaneTerminalViewTests: XCTestCase {
         await AsyncWait.drainMainQueue(seconds: 0.3)
 
         XCTAssertTrue(view.allowMouseReporting, "the posted mouse-up went through the monitor")
-        XCTAssertFalse(view.isSelectingOverMouseTracking)
+        XCTAssertFalse(view.isHoldingSelection)
         view.removeFromSuperview()
         XCTAssertNil(view.window)
     }
@@ -112,10 +177,11 @@ internal final class PaneTerminalViewTests: XCTestCase {
             [
                 #selector(PaneTerminalView.copy(_:)),
                 #selector(PaneTerminalView.paste(_:)),
-                #selector(NSView.selectAll(_:))
+                #selector(PaneTerminalView.selectAllText(_:))
             ]
         )
         XCTAssertTrue(items.allSatisfy { $0.target === view })
+        XCTAssertEqual(items.map { view.validateUserInterfaceItem($0) }, [false, true, true], "Copy needs a selection")
     }
 
     internal func testSelectAllThenCopyPutsTheTextOnThePasteboard() {
@@ -130,8 +196,10 @@ internal final class PaneTerminalViewTests: XCTestCase {
             }
         }
 
-        view.selectAll(nil)
+        view.selectAllText(nil)
         view.copy(self)
+
+        XCTAssertTrue(view.isHoldingSelection)
 
         XCTAssertEqual(pasteboard.string(forType: .string)?.contains("hello from the pane"), true)
     }
