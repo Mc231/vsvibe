@@ -6,6 +6,16 @@
     <description>VSVibe updates</description>
     <language>en</language>
     <item>
+      <title>Version 0.3.2</title>
+      <pubDate>Sun, 22 Nov 2026 07:53:10 GMT</pubDate>
+      <sparkle:version>42</sparkle:version>
+      <sparkle:shortVersionString>0.3.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;Fixed&lt;/h3&gt;
+&lt;ul&gt;&lt;li&gt;Copying from a pane running Claude (locally or over ssh): an Option-drag selection disappeared as soon as Claude redrew the screen, so Copy stayed disabled. The selection now stays until you click in the pane or type, and ⌘C, the right-click Copy and Select All work on it.&lt;/li&gt;&lt;/ul&gt;</description>
+      <enclosure url="https://github.com/Mc231/vsvibe/releases/download/v0.3.2/VSVibe-0.3.2.dmg" length="4922144" type="application/octet-stream" sparkle:edSignature="a8EeC4uAzH8sg8D4TOz53RuQz3sdN5Vn/zTchhqQAyZUKMJd8fOZiekiuABrFQB2/ZKIMb106hLIlBct9cPaDw==" />
+    </item>
+    <item>
       <title>Version 0.3.1</title>
       <pubDate>Sat, 21 Nov 2026 10:07:15 GMT</pubDate>
       <sparkle:version>41</sparkle:version>
